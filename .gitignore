@@ -1,1 +1,16 @@
 node_modules/
+.vs/
+
+[Dd]ebug/
+[Dd]ebug.4/
+[Rr]elease/
+[Rr]elease.4/
+[Rr]elease.last/
+build/
+[Bb]in/
+[Oo]bj/
+packages/
+*.suo
+*.user
+_ReSharper.*/
+*resharper.user

@@ -1,8 +1,8 @@
 #r "System.Runtime.dll"
 #r "System.Text.Encoding.dll"
 #r "System.Threading.Tasks.dll"
-#r "lib/roslyn/Microsoft.CodeAnalysis.dll"
-#r "lib/roslyn/Microsoft.CodeAnalysis.CSharp.dll"
+#r "Microsoft.CodeAnalysis.dll"
+#r "Microsoft.CodeAnalysis.CSharp.dll"
 
 using System;
 using System.Threading.Tasks;
