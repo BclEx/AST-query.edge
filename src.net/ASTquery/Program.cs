@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if !_LIB
+using System;
 using Microsoft.CodeAnalysis.CSharp;
 
 namespace QuoterHost
@@ -7,47 +8,80 @@ namespace QuoterHost
     {
         static void Main(string[] args)
         {
-            var sourceText = "class C{ public static void Print() {} }";
-//            var sourceText = @"
-//using System;
-//using System.Collections.Generic;
-//using System.Linq;
-//using System.Text;
-//using Microsoft.CodeAnalysis;
-//using Microsoft.CodeAnalysis.CSharp;
+            //var sourceText = "class C{ public static void Print() {} }";
 
-//namespace TopLevel
+            //            var sourceText = @"
+            //public class Startup
+            //{
+            //    public object Invoke(object input)
+            //    {
+            //          return (int)input + 7;
+            //    }
+            //}";
 
-//    using Microsoft;
-//    using System.ComponentModel;
+            var sourceText = @"
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
-//    namespace Child1
-//    {
-//        using Microsoft.Win32;
-//        using System.Runtime.InteropServices;
+namespace TopLevel {
 
-//        class Foo { }
-//    }
+    using Microsoft;
+    using System.ComponentModel;
 
-//    namespace Child2
-//    {
-//        using System.CodeDom;
-//        using Microsoft.CSharp;
+    namespace Child1
+    {
+        using Microsoft.Win32;
+        using System.Runtime.InteropServices;
 
-//        class Bar { }
-//    }
-//}";
+        class Foo { }
+    }
+
+    namespace Child2
+    {
+        using System.CodeDom;
+        using Microsoft.CSharp;
+
+        class Bar { }
+    }
+}";
+
             var sourceNode = (CSharpSyntaxTree.ParseText(sourceText).GetRoot() as CSharpSyntaxNode);
+#if Full
             var quoter = new Quoter
             {
                 OpenParenthesisOnNewLine = false,
                 ClosingParenthesisOnNewLine = false,
-                UseDefaultFormatting = true
+                UseDefaultFormatting = true,
             };
+            //var tree = quoter.Parse(sourceNode);
+            //var dyn = quoter.Print(tree);
+            //Console.WriteLine(dyn);
             var generatedCode = quoter.Quote(sourceNode);
             var resultText = quoter.Evaluate(generatedCode);
             Console.WriteLine(generatedCode);
             Console.WriteLine(resultText);
+#else
+            var quoter = new Quoter { };
+            var tree = quoter.Parse(sourceNode);
+            //var code = Quoter.FromApi(tree);
+
+            var dyn1 = Quoter.ToJson(tree);
+            Console.WriteLine(dyn1);
+            Console.WriteLine();
+            var dyn2 = Quoter.FromJson(dyn1);
+            Console.WriteLine(dyn2);
+            Console.WriteLine();
+
+//var generatedCode = quoter.Quote(sourceNode);
+            //var resultText = quoter.Evaluate(generatedCode);
+            //Console.WriteLine(generatedCode);
+            //Console.WriteLine(resultText);
+#endif
         }
     }
 }
+#endif

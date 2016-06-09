@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿#if !_LIB && !Full
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
@@ -11,99 +12,214 @@ public class Tests
     [TestMethod]
     public void TestUsingSystemWithRedundantCalls()
     {
-        Test(@"using System;
-", @"SyntaxFactory.CompilationUnit()
-.WithUsings(
-    SyntaxFactory.SingletonList<UsingDirectiveSyntax>(
-        SyntaxFactory.UsingDirective(
-            SyntaxFactory.IdentifierName(""System""))
-        .WithUsingKeyword(
-            SyntaxFactory.Token(SyntaxKind.UsingKeyword))
-        .WithSemicolonToken(
-            SyntaxFactory.Token(SyntaxKind.SemicolonToken))))
-.WithEndOfFileToken(
-    SyntaxFactory.Token(SyntaxKind.EndOfFileToken))
-.NormalizeWhitespace()", removeRedundantModifyingCalls: false);
-    }
-
-    [TestMethod]
-    public void TestUsingSystemWithUsingStatic()
+        Test1(@"using System;", @"{
+  'f:CompilationUnit': null,
+  'b': [
     {
-        Test(@"using System;
-", @"CompilationUnit()
-.WithUsings(
-    SingletonList<UsingDirectiveSyntax>(
-        UsingDirective(
-            IdentifierName(""System""))))
-.NormalizeWhitespace()", shortenCodeWithUsingStatic: true);
+      'w:Usings': [
+        {
+          'f:SingletonList<UsingDirectiveSyntax>': [
+            {
+              'f:UsingDirective': [
+                {
+                  'f:IdentifierName': [
+                    'System'
+                  ]
+                }
+              ],
+              'b': [
+                {
+                  'w:UsingKeyword': [
+                    {
+                      'f:Token': [
+                        'k:UsingKeyword'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:SemicolonToken': [
+                    {
+                      'f:Token': [
+                        'k:SemicolonToken'
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      'w:EndOfFileToken': [
+        {
+          'f:Token': [
+            'k:EndOfFileToken'
+          ]
+        }
+      ]
+    }
+  ]
+}".Replace("'", "\"")
+, removeRedundantModifyingCalls: false);
     }
 
     [TestMethod]
     public void TestUsingSystem()
     {
-        Test(@"using System;
-", @"SyntaxFactory.CompilationUnit()
-.WithUsings(
-    SyntaxFactory.SingletonList<UsingDirectiveSyntax>(
-        SyntaxFactory.UsingDirective(
-            SyntaxFactory.IdentifierName(""System""))))
-.NormalizeWhitespace()");
+        Test1(@"using System;", @"{
+  'f:CompilationUnit': null,
+  'b': [
+    {
+      'w:Usings': [
+        {
+          'f:SingletonList<UsingDirectiveSyntax>': [
+            {
+              'f:UsingDirective': [
+                {
+                  'f:IdentifierName': [
+                    'System'
+                  ]
+                }
+              ],
+              'b': []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}".Replace("'", "\""));
     }
 
     [TestMethod]
     public void TestSimpleClass()
     {
-        Test("class C { }", @"SyntaxFactory.CompilationUnit()
-.WithMembers(
-    SyntaxFactory.SingletonList<MemberDeclarationSyntax>(
-        SyntaxFactory.ClassDeclaration(""C"")
-        .WithKeyword(
-            SyntaxFactory.Token(SyntaxKind.ClassKeyword))
-        .WithOpenBraceToken(
-            SyntaxFactory.Token(SyntaxKind.OpenBraceToken))
-        .WithCloseBraceToken(
-            SyntaxFactory.Token(SyntaxKind.CloseBraceToken))))
-.WithEndOfFileToken(
-    SyntaxFactory.Token(SyntaxKind.EndOfFileToken))
-.NormalizeWhitespace()", removeRedundantModifyingCalls: false);
+        Test1(@"class C
+{
+}", @"{
+  'f:CompilationUnit': null,
+  'b': [
+    {
+      'w:Members': [
+        {
+          'f:SingletonList<MemberDeclarationSyntax>': [
+            {
+              'f:ClassDeclaration': [
+                'C'
+              ],
+              'b': [
+                {
+                  'w:Keyword': [
+                    {
+                      'f:Token': [
+                        'k:ClassKeyword'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:OpenBraceToken': [
+                    {
+                      'f:Token': [
+                        'k:OpenBraceToken'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:CloseBraceToken': [
+                    {
+                      'f:Token': [
+                        'k:CloseBraceToken'
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      'w:EndOfFileToken': [
+        {
+          'f:Token': [
+            'k:EndOfFileToken'
+          ]
+        }
+      ]
+    }
+  ]
+}".Replace("'", "\""), removeRedundantModifyingCalls: false);
     }
 
     [TestMethod]
     public void TestMissingToken()
     {
-        Test("class", @"SyntaxFactory.CompilationUnit()
-.WithMembers(
-    SyntaxFactory.SingletonList<MemberDeclarationSyntax>(
-        SyntaxFactory.ClassDeclaration(
-            SyntaxFactory.MissingToken(SyntaxKind.IdentifierToken))
-        .WithKeyword(
-            SyntaxFactory.Token(SyntaxKind.ClassKeyword))
-        .WithOpenBraceToken(
-            SyntaxFactory.MissingToken(SyntaxKind.OpenBraceToken))
-        .WithCloseBraceToken(
-            SyntaxFactory.MissingToken(SyntaxKind.CloseBraceToken))))
-.WithEndOfFileToken(
-    SyntaxFactory.Token(SyntaxKind.EndOfFileToken))
-.NormalizeWhitespace()", removeRedundantModifyingCalls: false);
-    }
-
-    [TestMethod]
-    public void TestMissingTokenWithUsingStatic()
+        Test1("class", @"{
+  'f:CompilationUnit': null,
+  'b': [
     {
-        Test("class", @"CompilationUnit()
-.WithMembers(
-    SingletonList<MemberDeclarationSyntax>(
-        ClassDeclaration(
-            MissingToken(SyntaxKind.IdentifierToken))
-        .WithKeyword(
-            Token(SyntaxKind.ClassKeyword))
-        .WithOpenBraceToken(
-            MissingToken(SyntaxKind.OpenBraceToken))
-        .WithCloseBraceToken(
-            MissingToken(SyntaxKind.CloseBraceToken))))
-.WithEndOfFileToken(
-    Token(SyntaxKind.EndOfFileToken))
-.NormalizeWhitespace()", removeRedundantModifyingCalls: false, shortenCodeWithUsingStatic: true);
+      'w:Members': [
+        {
+          'f:SingletonList<MemberDeclarationSyntax>': [
+            {
+              'f:ClassDeclaration': [
+                {
+                  'f:MissingToken': [
+                    'k:IdentifierToken'
+                  ]
+                }
+              ],
+              'b': [
+                {
+                  'w:Keyword': [
+                    {
+                      'f:Token': [
+                        'k:ClassKeyword'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:OpenBraceToken': [
+                    {
+                      'f:MissingToken': [
+                        'k:OpenBraceToken'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:CloseBraceToken': [
+                    {
+                      'f:MissingToken': [
+                        'k:CloseBraceToken'
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      'w:EndOfFileToken': [
+        {
+          'f:Token': [
+            'k:EndOfFileToken'
+          ]
+        }
+      ]
+    }
+  ]
+}".Replace("'", "\""), removeRedundantModifyingCalls: false);
     }
 
     [TestMethod]
@@ -133,125 +249,520 @@ public class Tests
     [TestMethod]
     public void TestHelloWorld()
     {
-        Test(@"using System;
+        Test1(@"using System;
 
-namespace N
-{
-    class Program
+    namespace N
     {
-        static void Main(string[] args)
+        class Program
         {
-            Console.WriteLine(""Hello World""); // comment
+            static void Main(string[] args)
+            {
+                Console.WriteLine(""Hello World""); // comment
+            }
         }
+    }", @"{
+  'f:CompilationUnit': null,
+  'b': [
+    {
+      'w:Members': [
+        {
+          'f:SingletonList<MemberDeclarationSyntax>': [
+            {
+              'f:ClassDeclaration': [
+                {
+                  'f:MissingToken': [
+                    'k:IdentifierToken'
+                  ]
+                }
+              ],
+              'b': [
+                {
+                  'w:Keyword': [
+                    {
+                      'f:Token': [
+                        'k:ClassKeyword'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:OpenBraceToken': [
+                    {
+                      'f:MissingToken': [
+                        'k:OpenBraceToken'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:CloseBraceToken': [
+                    {
+                      'f:MissingToken': [
+                        'k:CloseBraceToken'
+                      ]{
+  'f:CompilationUnit': null,
+  'b': [
+    {
+      'w:Usings': [
+        {
+          'f:SingletonList<UsingDirectiveSyntax>': [
+            {
+              'f:UsingDirective': [
+                {
+                  'f:IdentifierName': [
+                    'System'
+                  ]
+                }
+              ],
+              'b': [
+                {
+                  'w:UsingKeyword': [
+                    {
+                      'f:Token': [
+                        'k:UsingKeyword'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:SemicolonToken': [
+                    {
+                      'f:Token': [
+                        'k:SemicolonToken'
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      'w:Members': [
+        {
+          'f:SingletonList<MemberDeclarationSyntax>': [
+            {
+              'f:NamespaceDeclaration': [
+                {
+                  'f:IdentifierName': [
+                    'N'
+                  ]
+                }
+              ],
+              'b': [
+                {
+                  'w:NamespaceKeyword': [
+                    {
+                      'f:Token': [
+                        'k:NamespaceKeyword'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:OpenBraceToken': [
+                    {
+                      'f:Token': [
+                        'k:OpenBraceToken'
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:Members': [
+                    {
+                      'f:SingletonList<MemberDeclarationSyntax>': [
+                        {
+                          'f:ClassDeclaration': [
+                            'Program'
+                          ],
+                          'b': [
+                            {
+                              'w:Keyword': [
+                                {
+                                  'f:Token': [
+                                    'k:ClassKeyword'
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              'w:OpenBraceToken': [
+                                {
+                                  'f:Token': [
+                                    'k:OpenBraceToken'
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              'w:Members': [
+                                {
+                                  'f:SingletonList<MemberDeclarationSyntax>': [
+                                    {
+                                      'f:MethodDeclaration': [
+                                        {
+                                          'f:PredefinedType': [
+                                            {
+                                              'f:Token': [
+                                                'k:VoidKeyword'
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          'f:Identifier': [
+                                            'Main'
+                                          ]
+                                        }
+                                      ],
+                                      'b': [
+                                        {
+                                          'w:Modifiers': [
+                                            {
+                                              'f:TokenList': [
+                                                {
+                                                  'f:Token': [
+                                                    'k:StaticKeyword'
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          'w:ParameterList': [
+                                            {
+                                              'f:ParameterList': [
+                                                {
+                                                  'f:SingletonSeparatedList<ParameterSyntax>': [
+                                                    {
+                                                      'f:Parameter': [
+                                                        {
+                                                          'f:Identifier': [
+                                                            'args'
+                                                          ]
+                                                        }
+                                                      ],
+                                                      'b': [
+                                                        {
+                                                          'w:Type': [
+                                                            {
+                                                              'f:ArrayType': [
+                                                                {
+                                                                  'f:PredefinedType': [
+                                                                    {
+                                                                      'f:Token': [
+                                                                        'k:StringKeyword'
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ],
+                                                              'b': [
+                                                                {
+                                                                  'w:RankSpecifiers': [
+                                                                    {
+                                                                      'f:SingletonList<ArrayRankSpecifierSyntax>': [
+                                                                        {
+                                                                          'f:ArrayRankSpecifier': [
+                                                                            {
+                                                                              'f:SingletonSeparatedList<ExpressionSyntax>': [
+                                                                                {
+                                                                                  'f:OmittedArraySizeExpression': null,
+                                                                                  'b': [
+                                                                                    {
+                                                                                      'w:OmittedArraySizeExpressionToken': [
+                                                                                        {
+                                                                                          'f:Token': [
+                                                                                            'k:OmittedArraySizeExpressionToken'
+                                                                                          ]
+                                                                                        }
+                                                                                      ]
+                                                                                    }
+                                                                                  ]
+                                                                                }
+                                                                              ]
+                                                                            }
+                                                                          ],
+                                                                          'b': [
+                                                                            {
+                                                                              'w:OpenBracketToken': [
+                                                                                {
+                                                                                  'f:Token': [
+                                                                                    'k:OpenBracketToken'
+                                                                                  ]
+                                                                                }
+                                                                              ]
+                                                                            },
+                                                                            {
+                                                                              'w:CloseBracketToken': [
+                                                                                {
+                                                                                  'f:Token': [
+                                                                                    'k:CloseBracketToken'
+                                                                                  ]
+                                                                                }
+                                                                              ]
+                                                                            }
+                                                                          ]
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ],
+                                              'b': [
+                                                {
+                                                  'w:OpenParenToken': [
+                                                    {
+                                                      'f:Token': [
+                                                        'k:OpenParenToken'
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  'w:CloseParenToken': [
+                                                    {
+                                                      'f:Token': [
+                                                        'k:CloseParenToken'
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          'w:Body': [
+                                            {
+                                              'f:Block': [
+                                                {
+                                                  'f:SingletonList<StatementSyntax>': [
+                                                    {
+                                                      'f:ExpressionStatement': [
+                                                        {
+                                                          'f:InvocationExpression': [
+                                                            {
+                                                              'f:MemberAccessExpression': [
+                                                                {
+                                                                  'k:SimpleMemberAccessExpression': null
+                                                                },
+                                                                {
+                                                                  'f:IdentifierName': [
+                                                                    'Console'
+                                                                  ]
+                                                                },
+                                                                {
+                                                                  'f:IdentifierName': [
+                                                                    'WriteLine'
+                                                                  ]
+                                                                }
+                                                              ],
+                                                              'b': [
+                                                                {
+                                                                  'w:OperatorToken': [
+                                                                    {
+                                                                      'f:Token': [
+                                                                        'k:DotToken'
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ],
+                                                          'b': [
+                                                            {
+                                                              'w:ArgumentList': [
+                                                                {
+                                                                  'f:ArgumentList': [
+                                                                    {
+                                                                      'f:SingletonSeparatedList<ArgumentSyntax>': [
+                                                                        {
+                                                                          'f:Argument': [
+                                                                            {
+                                                                              'f:LiteralExpression': [
+                                                                                {
+                                                                                  'k:StringLiteralExpression': null
+                                                                                },
+                                                                                {
+                                                                                  'f:Literal': [
+                                                                                    'Hello World'
+                                                                                  ]
+                                                                                }
+                                                                              ]
+                                                                            }
+                                                                          ]
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ],
+                                                                  'b': [
+                                                                    {
+                                                                      'w:OpenParenToken': [
+                                                                        {
+                                                                          'f:Token': [
+                                                                            'k:OpenParenToken'
+                                                                          ]
+                                                                        }
+                                                                      ]
+                                                                    },
+                                                                    {
+                                                                      'w:CloseParenToken': [
+                                                                        {
+                                                                          'f:Token': [
+                                                                            'k:CloseParenToken'
+                                                                          ]
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      ],
+                                                      'b': [
+                                                        {
+                                                          'w:SemicolonToken': [
+                                                            {
+                                                              'f:Token': [
+                                                                {
+                                                                  'f:TriviaList': null
+                                                                },
+                                                                'k:SemicolonToken',
+                                                                {
+                                                                  'f:TriviaList': [
+                                                                    {
+                                                                      'f:Comment': [
+                                                                        '// comment'
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ],
+                                              'b': [
+                                                {
+                                                  'w:OpenBraceToken': [
+                                                    {
+                                                      'f:Token': [
+                                                        'k:OpenBraceToken'
+                                                      ]
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  'w:CloseBraceToken': [
+                                                    {
+                                                      'f:Token': [
+                                                        'k:CloseBraceToken'
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              'w:CloseBraceToken': [
+                                {
+                                  'f:Token': [
+                                    'k:CloseBraceToken'
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  'w:CloseBraceToken': [
+                    {
+                      'f:Token': [
+                        'k:CloseBraceToken'
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      'w:EndOfFileToken': [
+        {
+          'f:Token': [
+            'k:EndOfFileToken'
+          ]
+        }
+      ]
     }
-}", @"SyntaxFactory.CompilationUnit()
-.WithUsings(
-    SyntaxFactory.SingletonList<UsingDirectiveSyntax>(
-        SyntaxFactory.UsingDirective(
-            SyntaxFactory.IdentifierName(""System""))
-        .WithUsingKeyword(
-            SyntaxFactory.Token(SyntaxKind.UsingKeyword))
-        .WithSemicolonToken(
-            SyntaxFactory.Token(SyntaxKind.SemicolonToken))))
-.WithMembers(
-    SyntaxFactory.SingletonList<MemberDeclarationSyntax>(
-        SyntaxFactory.NamespaceDeclaration(
-            SyntaxFactory.IdentifierName(""N""))
-        .WithNamespaceKeyword(
-            SyntaxFactory.Token(SyntaxKind.NamespaceKeyword))
-        .WithOpenBraceToken(
-            SyntaxFactory.Token(SyntaxKind.OpenBraceToken))
-        .WithMembers(
-            SyntaxFactory.SingletonList<MemberDeclarationSyntax>(
-                SyntaxFactory.ClassDeclaration(""Program"")
-                .WithKeyword(
-                    SyntaxFactory.Token(SyntaxKind.ClassKeyword))
-                .WithOpenBraceToken(
-                    SyntaxFactory.Token(SyntaxKind.OpenBraceToken))
-                .WithMembers(
-                    SyntaxFactory.SingletonList<MemberDeclarationSyntax>(
-                        SyntaxFactory.MethodDeclaration(
-                            SyntaxFactory.PredefinedType(
-                                SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
-                            SyntaxFactory.Identifier(""Main""))
-                        .WithModifiers(
-                            SyntaxFactory.TokenList(
-                                SyntaxFactory.Token(SyntaxKind.StaticKeyword)))
-                        .WithParameterList(
-                            SyntaxFactory.ParameterList(
-                                SyntaxFactory.SingletonSeparatedList<ParameterSyntax>(
-                                    SyntaxFactory.Parameter(
-                                        SyntaxFactory.Identifier(""args""))
-                                    .WithType(
-                                        SyntaxFactory.ArrayType(
-                                            SyntaxFactory.PredefinedType(
-                                                SyntaxFactory.Token(SyntaxKind.StringKeyword)))
-                                        .WithRankSpecifiers(
-                                            SyntaxFactory.SingletonList<ArrayRankSpecifierSyntax>(
-                                                SyntaxFactory.ArrayRankSpecifier(
-                                                    SyntaxFactory.SingletonSeparatedList<ExpressionSyntax>(
-                                                        SyntaxFactory.OmittedArraySizeExpression()
-                                                        .WithOmittedArraySizeExpressionToken(
-                                                            SyntaxFactory.Token(SyntaxKind.OmittedArraySizeExpressionToken))))
-                                                .WithOpenBracketToken(
-                                                    SyntaxFactory.Token(SyntaxKind.OpenBracketToken))
-                                                .WithCloseBracketToken(
-                                                    SyntaxFactory.Token(SyntaxKind.CloseBracketToken)))))))
-                            .WithOpenParenToken(
-                                SyntaxFactory.Token(SyntaxKind.OpenParenToken))
-                            .WithCloseParenToken(
-                                SyntaxFactory.Token(SyntaxKind.CloseParenToken)))
-                        .WithBody(
-                            SyntaxFactory.Block(
-                                SyntaxFactory.SingletonList<StatementSyntax>(
-                                    SyntaxFactory.ExpressionStatement(
-                                        SyntaxFactory.InvocationExpression(
-                                            SyntaxFactory.MemberAccessExpression(
-                                                SyntaxKind.SimpleMemberAccessExpression,
-                                                SyntaxFactory.IdentifierName(""Console""),
-                                                SyntaxFactory.IdentifierName(""WriteLine""))
-                                            .WithOperatorToken(
-                                                SyntaxFactory.Token(SyntaxKind.DotToken)))
-                                        .WithArgumentList(
-                                            SyntaxFactory.ArgumentList(
-                                                SyntaxFactory.SingletonSeparatedList<ArgumentSyntax>(
-                                                    SyntaxFactory.Argument(
-                                                        SyntaxFactory.LiteralExpression(
-                                                            SyntaxKind.StringLiteralExpression,
-                                                            SyntaxFactory.Literal(""Hello World"")))))
-                                            .WithOpenParenToken(
-                                                SyntaxFactory.Token(SyntaxKind.OpenParenToken))
-                                            .WithCloseParenToken(
-                                                SyntaxFactory.Token(SyntaxKind.CloseParenToken))))
-                                    .WithSemicolonToken(
-                                        SyntaxFactory.Token(
-                                            SyntaxFactory.TriviaList(),
-                                            SyntaxKind.SemicolonToken,
-                                            SyntaxFactory.TriviaList(
-                                                SyntaxFactory.Comment(""// comment""))))))
-                            .WithOpenBraceToken(
-                                SyntaxFactory.Token(SyntaxKind.OpenBraceToken))
-                            .WithCloseBraceToken(
-                                SyntaxFactory.Token(SyntaxKind.CloseBraceToken)))))
-                .WithCloseBraceToken(
-                    SyntaxFactory.Token(SyntaxKind.CloseBraceToken))))
-        .WithCloseBraceToken(
-            SyntaxFactory.Token(SyntaxKind.CloseBraceToken))))
-.WithEndOfFileToken(
-    SyntaxFactory.Token(SyntaxKind.EndOfFileToken))
-.NormalizeWhitespace()", removeRedundantModifyingCalls: false);
+  ]
+}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      'w:EndOfFileToken': [
+        {
+          'f:Token': [
+            'k:EndOfFileToken'
+          ]
+        }
+      ]
+    }
+  ]
+}".Replace("'", "\""), removeRedundantModifyingCalls: false);
     }
 
     [TestMethod]
     public void TestComment()
     {
         Test(@"class C
-{
-  void M()
-  {
-    A(""M""); // comment
-  }
-}");
+    {
+      void M()
+      {
+        A(""M""); // comment
+      }
+    }");
     }
 
     [TestMethod]
@@ -295,13 +806,13 @@ namespace N
     {
         Test(@"using System;
 
-class Program
-{
-    static void Main(string[] args)
+    class Program
     {
-        
-    }
-}");
+        static void Main(string[] args)
+        {
+
+        }
+    }");
     }
 
     [TestMethod]
@@ -338,8 +849,8 @@ class Program
     public void Roundtrip8()
     {
         Test(@"#if false
-int i
-#endif");
+    int i
+    " + "#endif");
     }
 
     [TestMethod]
@@ -382,8 +893,8 @@ int i
     public void Roundtrip15()
     {
         Test(@"class C { void M() { ((Action)(async () =>
-                {
-                }))(); } }");
+                    {
+                    }))(); } }");
     }
 
     [TestMethod]
@@ -401,7 +912,7 @@ int i
 
     private void RoundtripFile(string filePath)
     {
-        Test(File.ReadAllText(GetPath(filePath)), useDefaultFormatting: false, removeRedundantCalls: false, shortenCodeWithUsingStatic: true);
+        Test(File.ReadAllText(GetPath(filePath)), useDefaultFormatting: false, removeRedundantCalls: false, useJson: true);
     }
 
     [TestMethod]
@@ -433,7 +944,7 @@ int i
     public void Roundtrip24()
     {
         Test(@"///
-class C { }");
+    class C { }");
     }
 
     [TestMethod]
@@ -446,14 +957,14 @@ class C { }");
     public void Roundtrip26()
     {
         Test(@"
-namespace @N
-{
-   public class @A
-   {
-       public @string @P { get; set; }
-   }
-}
-");
+    namespace @N
+    {
+       public class @A
+       {
+           public @string @P { get; set; }
+       }
+    }
+    ");
     }
 
     [TestMethod]
@@ -514,31 +1025,30 @@ namespace @N
     public void TestXmlDocComment()
     {
         Test(@"    /// <summary>
-    /// test
-    /// </summary>
-class C { }");
+        /// test
+        /// </summary>
+    class C { }");
     }
 
-    private void Test(string sourceText, string expected, bool useDefaultFormatting = true, bool removeRedundantModifyingCalls = true, bool shortenCodeWithUsingStatic = false)
+    private void Test1(string sourceText, string expected, bool useDefaultFormatting = true, bool removeRedundantModifyingCalls = true)
     {
         var quoter = new Quoter
         {
             UseDefaultFormatting = useDefaultFormatting,
             RemoveRedundantModifyingCalls = removeRedundantModifyingCalls,
-            ShortenCodeWithUsingStatic = shortenCodeWithUsingStatic
         };
-        var actual = quoter.Quote(sourceText);
+        var actual = quoter.Quote(sourceText, true);
         Assert.AreEqual(expected, actual);
         Test(sourceText);
     }
 
     private void Test(string sourceText)
     {
-        Test(sourceText, useDefaultFormatting: true, removeRedundantCalls: true, shortenCodeWithUsingStatic: false);
-        Test(sourceText, useDefaultFormatting: false, removeRedundantCalls: true, shortenCodeWithUsingStatic: true);
+        Test(sourceText, useDefaultFormatting: true, removeRedundantCalls: true, useJson: true);
+        Test(sourceText, useDefaultFormatting: true, removeRedundantCalls: true, useJson: false);
     }
 
-    private static void Test(string sourceText, bool useDefaultFormatting, bool removeRedundantCalls, bool shortenCodeWithUsingStatic)
+    private static void Test(string sourceText, bool useDefaultFormatting, bool removeRedundantCalls, bool useJson)
     {
         if (useDefaultFormatting)
             sourceText = CSharpSyntaxTree.ParseText(sourceText).GetRoot()
@@ -548,15 +1058,24 @@ class C { }");
             UseDefaultFormatting = useDefaultFormatting,
             RemoveRedundantModifyingCalls = removeRedundantCalls
         };
-        var generatedCode = quoter.Quote(sourceText);
-        var resultText = quoter.Evaluate(generatedCode);
+        string actual;
+        if (useJson)
+        {
+            var generatedCode = quoter.Quote(sourceText);
+            actual = Quoter.FromJson(generatedCode).ToFullString();
+        }
+        else
+        {
+            var generatedCode = quoter.Parse(sourceText);
+            actual = Quoter.FromApi(generatedCode).ToFullString();
+        }
         //if (sourceText != resultText)
         //{
         //    //File.WriteAllText(@"D:\1.txt", sourceText);
         //    //File.WriteAllText(@"D:\2.txt", resultText);
         //    //File.WriteAllText(@"D:\3.txt", generatedCode);
         //}
-        Assert.AreEqual(sourceText, resultText);
+        Assert.AreEqual(sourceText, actual);
     }
 
     public void CheckSourceFiles()
@@ -587,3 +1106,4 @@ class C { }");
         File.AppendAllText(@"Failed.txt", text + Environment.NewLine);
     }
 }
+#endif

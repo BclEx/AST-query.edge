@@ -10,11 +10,12 @@ using System.Text;
 /// Data structure to represent code (API calls) of simple hierarchical shape such as:
 /// A.B(C, D.E(F(G, H), I))
 /// </example>
-internal class ApiCall
+public class ApiCall
 {
     public string Name { get; private set; }
     public MemberCall FactoryMethodCall { get; private set; }
     public List<MethodCall> InstanceMethodCalls { get; private set; }
+
     public bool UseCurliesInsteadOfParentheses { get; private set; }
 
     public ApiCall()
@@ -50,27 +51,21 @@ internal class ApiCall
     public void Add(MethodCall methodCall)
     {
         if (InstanceMethodCalls == null)
-        {
             InstanceMethodCalls = new List<MethodCall>();
-        }
-
         InstanceMethodCalls.Add(methodCall);
     }
 
     public void Remove(MethodCall methodCall)
     {
         if (InstanceMethodCalls == null)
-        {
             return;
-        }
-
         InstanceMethodCalls.Remove(methodCall);
     }
 
-    public override string ToString()
-    {
-        return Quoter.PrintWithDefaultFormatting(this);
-    }
+    //public override string ToString()
+    //{
+    //    return Quoter.PrintWithDefaultFormatting(this);
+    //}
 }
 
 /// <summary>
@@ -80,12 +75,12 @@ public class MemberCall
 {
     public string Name { get; set; }
 
-    public override string ToString()
-    {
-        var sb = new StringBuilder();
-        Quoter.Print(this, sb, 0);
-        return sb.ToString();
-    }
+    //public override string ToString()
+    //{
+    //    var sb = new StringBuilder();
+    //    Quoter.Print(this, sb, 0);
+    //    return sb.ToString();
+    //}
 }
 
 /// <summary>
@@ -98,10 +93,7 @@ public class MethodCall : MemberCall
     public void AddArgument(object value)
     {
         if (Arguments == null)
-        {
             Arguments = new List<object>();
-        }
-
         Arguments.Add(value);
     }
 }

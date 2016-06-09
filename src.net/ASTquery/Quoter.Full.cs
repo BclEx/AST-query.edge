@@ -1,20 +1,23 @@
-﻿#if !Full
+﻿#if Full
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Newtonsoft.Json;
+using Microsoft.CodeAnalysis.Scripting;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 
 public class Quoter
 {
+    public bool OpenParenthesisOnNewLine { get; set; }
+    public bool ClosingParenthesisOnNewLine { get; set; }
     public bool UseDefaultFormatting { get; set; }
     public bool RemoveRedundantModifyingCalls { get; set; }
+    public bool ShortenCodeWithUsingStatic { get; set; }
 
     #region Statics
 
@@ -52,6 +55,15 @@ public class Quoter
         "Span",
         "SyntaxTree",
     };
+
+    static readonly ScriptOptions _options = ScriptOptions.Default
+        .AddReferences(typeof(SyntaxNode).Assembly, typeof(CSharpSyntaxNode).Assembly)
+        .AddImports(
+            "System",
+            "Microsoft.CodeAnalysis",
+            "Microsoft.CodeAnalysis.CSharp",
+            "Microsoft.CodeAnalysis.CSharp.Syntax",
+            "Microsoft.CodeAnalysis.CSharp.SyntaxFactory");
 
     /// <summary>
     /// Static methods on Microsoft.CodeAnalysis.CSharp.SyntaxFactory class that construct SyntaxNodes
@@ -109,16 +121,18 @@ public class Quoter
         RemoveRedundantModifyingCalls = true;
     }
 
-    public string Quote(string sourceText, bool jsonIndented = false)
+    public string Quote(string sourceText)
     {
         var sourceTree = CSharpSyntaxTree.ParseText(sourceText);
-        return ToJson(Parse(sourceTree.GetRoot()), jsonIndented);
+        return Print(Parse(sourceTree.GetRoot()));
     }
 
-    public string Quote(SyntaxNode node, bool jsonIndented = false)
+    public string Quote(SyntaxNode node)
     {
         var rootApiCall = QuoteRecurse(node, name: null);
-        return ToJson(rootApiCall, jsonIndented);
+        if (UseDefaultFormatting)
+            rootApiCall.Add(new MethodCall { Name = ".NormalizeWhitespace" });
+        return Print(rootApiCall);
     }
 
     public ApiCall Parse(string sourceText)
@@ -129,15 +143,20 @@ public class Quoter
 
     public ApiCall Parse(SyntaxNode node)
     {
+        Console.WriteLine(node.ToString());
         var rootApiCall = QuoteRecurse(node, name: null);
+        if (UseDefaultFormatting)
+            rootApiCall.Add(new MethodCall { Name = ".NormalizeWhitespace" });
         return rootApiCall;
     }
 
     #region Utility
 
-    private static string GetSyntaxFactory(string text)
+    private string SyntaxFactory(string text)
     {
-        return "f:" + text;
+        if (!ShortenCodeWithUsingStatic)
+            text = "SyntaxFactory." + text;
+        return text;
     }
 
     private static void AddIfNotNull(List<object> arguments, object value)
@@ -184,7 +203,9 @@ public class Quoter
     {
         var quotedPropertyValues = QuotePropertyValues(node);
         var factoryMethod = PickFactoryMethodToCreateNode(node);
-        var factoryMethodName = (factoryMethod.DeclaringType.Name == "SyntaxFactory" ? GetSyntaxFactory(factoryMethod.Name) : factoryMethod.DeclaringType.Name + "." + factoryMethod.Name);
+        var factoryMethodName = factoryMethod.Name;
+        if (!ShortenCodeWithUsingStatic)
+            factoryMethodName = factoryMethod.DeclaringType.Name + "." + factoryMethodName;
         var factoryMethodCall = new MethodCall { Name = factoryMethodName };
         var codeBlock = new ApiCall(name, factoryMethodCall);
         AddFactoryMethodArguments(factoryMethod, factoryMethodCall, quotedPropertyValues);
@@ -234,7 +255,8 @@ public class Quoter
                 return firstParameterOptional;
         }
         // otherwise just pick the first one (this is arbitrary)
-        return candidatesWithMinParameterCount[0];
+        factory = candidatesWithMinParameterCount[0];
+        return factory;
     }
 
     /// <summary>
@@ -251,7 +273,7 @@ public class Quoter
             var properCase = ProperCase(value.Name);
             var methodName = "With" + properCase;
             if (methods.Any(m => m.Name == methodName))
-                methodName = "w:" + methodName.Substring(4);
+                methodName = "." + methodName;
             else
                 throw new NotSupportedException("Sorry, this is a bug in the AST-query Quoter. Please file a bug at https://github.com/BclEx/AST-query.edge/issues/new.");
             var methodCall = new MethodCall
@@ -263,23 +285,23 @@ public class Quoter
         }
     }
 
+    internal static string ProperCase(string str)
+    {
+        return char.ToUpperInvariant(str[0]) + str.Substring(1);
+    }
+
     private void AddModifyingCall(ApiCall apiCall, MethodCall methodCall)
     {
         if (RemoveRedundantModifyingCalls)
         {
-            var before = GetCode(apiCall);
+            var before = Evaluate(apiCall, UseDefaultFormatting);
             apiCall.Add(methodCall);
-            var after = GetCode(apiCall);
+            var after = Evaluate(apiCall, UseDefaultFormatting);
             if (before == after)
                 apiCall.Remove(methodCall);
             return;
         }
         apiCall.Add(methodCall);
-    }
-
-    internal static string ProperCase(string str)
-    {
-        return char.ToUpperInvariant(str[0]) + str.Substring(1);
     }
 
     /// <summary>
@@ -316,7 +338,7 @@ public class Quoter
             node is PrefixUnaryExpressionSyntax ||
             node is DocumentationCommentTriviaSyntax ||
             node is YieldStatementSyntax)
-            result.Add(new ApiCall("Kind", "k:" + node.Kind().ToString()));
+            result.Add(new ApiCall("Kind", "SyntaxKind." + node.Kind().ToString()));
         return result;
     }
 
@@ -339,7 +361,11 @@ public class Quoter
         if (value is SyntaxNode)
             return QuoteNodeRecurse((SyntaxNode)value, property.Name);
         if (value is string)
-            return new ApiCall(property.Name, EscapeAndQuote("*", value.ToString()));
+        {
+            var text = value.ToString();
+            var verbatim = text.Contains("\r") || text.Contains("\n");
+            return new ApiCall(property.Name, EscapeAndQuote(text, verbatim));
+        }
         if (value is bool)
             return new ApiCall(property.Name, value.ToString().ToLowerInvariant());
         return null;
@@ -360,7 +386,7 @@ public class Quoter
                 {
                     var argument = (methodCall.Arguments[0] as ApiCall);
                     var arrayCreation = (argument.FactoryMethodCall as MethodCall);
-                    if (argument != null && arrayCreation != null && arrayCreation.Name.StartsWith("n:"))
+                    if (argument != null && arrayCreation != null && arrayCreation.Name.StartsWith("new ") && arrayCreation.Name.EndsWith("[]"))
                     {
                         foreach (var arrayElement in arrayCreation.Arguments)
                             factoryMethodCall.AddArgument(arrayElement);
@@ -374,7 +400,7 @@ public class Quoter
             {
                 quotedCodeBlock = quotedValues.First(a => a.Name == "Identifier");
                 var methodCall = (quotedCodeBlock.FactoryMethodCall as MethodCall);
-                if (methodCall != null && methodCall.Name == GetSyntaxFactory("Identifier"))
+                if (methodCall != null && methodCall.Name == SyntaxFactory("Identifier"))
                 {
                     factoryMethodCall.AddArgument(methodCall.Arguments.Count == 1 ? methodCall.Arguments[0] : quotedCodeBlock);
                     quotedValues.Remove(quotedCodeBlock);
@@ -385,7 +411,7 @@ public class Quoter
             else if (parameterName == "identifier" && parameterType == typeof(string))
             {
                 var methodCall = quotedCodeBlock.FactoryMethodCall as MethodCall;
-                if (methodCall != null && methodCall.Name == GetSyntaxFactory("Identifier") && methodCall.Arguments.Count == 1)
+                if (methodCall != null && methodCall.Name == SyntaxFactory("Identifier") && methodCall.Arguments.Count == 1)
                 {
                     factoryMethodCall.AddArgument(methodCall.Arguments[0]);
                     quotedValues.Remove(quotedCodeBlock);
@@ -409,7 +435,7 @@ public class Quoter
     private ApiCall QuoteList(IEnumerable syntaxList, string name)
     {
         var sourceList = syntaxList.Cast<object>();
-        var methodName = GetSyntaxFactory("List");
+        var methodName = SyntaxFactory("List");
         string listType = null;
         var propertyType = syntaxList.GetType();
         if (propertyType.IsGenericType)
@@ -418,16 +444,16 @@ public class Quoter
             if (propertyType.GetGenericTypeDefinition() == typeof(SeparatedSyntaxList<>))
             {
                 listType = "SyntaxNodeOrToken";
-                methodName = GetSyntaxFactory("SeparatedList");
+                methodName = SyntaxFactory("SeparatedList");
                 sourceList = ((SyntaxNodeOrTokenList)syntaxList.GetType().GetMethod("GetWithSeparators").Invoke(syntaxList, null)).Cast<object>().ToArray();
             }
             else listType = methodType;
             methodName += "<" + methodType + ">";
         }
         if (propertyType.Name == "SyntaxTokenList")
-            methodName = GetSyntaxFactory("TokenList");
+            methodName = SyntaxFactory("TokenList");
         else if (propertyType.Name == "SyntaxTriviaList")
-            methodName = GetSyntaxFactory("TriviaList");
+            methodName = SyntaxFactory("TriviaList");
         var elements = new List<object>(sourceList
             .Select(o => QuoteRecurse(o))
             .Where(cb => cb != null)).ToList();
@@ -437,17 +463,17 @@ public class Quoter
         {
             if (methodName.StartsWith("List"))
                 methodName = "SingletonList" + methodName.Substring("List".Length);
-            else if (methodName.StartsWith(GetSyntaxFactory("List")))
-                methodName = GetSyntaxFactory("SingletonList") + methodName.Substring(GetSyntaxFactory("List").Length);
+            else if (methodName.StartsWith(SyntaxFactory("List")))
+                methodName = SyntaxFactory("SingletonList") + methodName.Substring(SyntaxFactory("List").Length);
             else if (methodName.StartsWith("SeparatedList"))
                 methodName = "SingletonSeparatedList" + methodName.Substring("SeparatedList".Length);
-            else if (methodName.StartsWith(GetSyntaxFactory("SeparatedList")))
-                methodName = GetSyntaxFactory("SingletonSeparatedList") + methodName.Substring(GetSyntaxFactory("SeparatedList").Length);
+            else if (methodName.StartsWith(SyntaxFactory("SeparatedList")))
+                methodName = SyntaxFactory("SingletonSeparatedList") + methodName.Substring(SyntaxFactory("SeparatedList").Length);
         }
         else
             elements = new List<object>
             {
-                new ApiCall("methodName", "n:" + listType, elements)
+                new ApiCall("methodName", "new " + listType + "[]", elements, useCurliesInsteadOfParentheses: true)
             };
         return new ApiCall(name, methodName, elements);
     }
@@ -462,8 +488,11 @@ public class Quoter
         if (value == default(SyntaxToken) || (valueKind = value.Kind()) == SyntaxKind.None)
             return null;
         var arguments = new List<object>();
-        var methodName = GetSyntaxFactory("Token");
-        var verbatim = value.Text.StartsWith("@") || value.Text.Contains("\r") || value.Text.Contains("\n");
+        var methodName = SyntaxFactory("Token");
+        var verbatim =
+            value.Text.StartsWith("@") ||
+            value.Text.Contains("\r") ||
+            value.Text.Contains("\n");
         var escapedTokenValueText = EscapeAndQuote(value.ToString(), verbatim);
         var leading = GetLeadingTrivia(value);
         object actualValue;
@@ -475,7 +504,7 @@ public class Quoter
         }
         if (valueKind == SyntaxKind.IdentifierToken && !value.IsMissing)
         {
-            methodName = (value.IsMissing ? GetSyntaxFactory("MissingToken") : GetSyntaxFactory("Identifier"));
+            methodName = (value.IsMissing ? SyntaxFactory("MissingToken") : SyntaxFactory("Identifier"));
             actualValue = (value.IsMissing ? (object)value.Kind() : escapedTokenValueText);
             AddIfNotNull(arguments, leading);
             arguments.Add(actualValue);
@@ -495,9 +524,9 @@ public class Quoter
             valueKind == SyntaxKind.XmlTextLiteralNewLineToken ||
             valueKind == SyntaxKind.XmlEntityLiteralToken) && !value.IsMissing)
         {
-            if (valueKind == SyntaxKind.XmlTextLiteralNewLineToken) methodName = GetSyntaxFactory("XmlTextNewLine");
-            else if (valueKind == SyntaxKind.XmlEntityLiteralToken) methodName = GetSyntaxFactory("XmlEntity");
-            else methodName = GetSyntaxFactory("XmlTextLiteral");
+            if (valueKind == SyntaxKind.XmlTextLiteralNewLineToken) methodName = SyntaxFactory("XmlTextNewLine");
+            else if (valueKind == SyntaxKind.XmlEntityLiteralToken) methodName = SyntaxFactory("XmlEntity");
+            else methodName = SyntaxFactory("XmlTextLiteral");
             arguments.Add(leading ?? GetEmptyTrivia("LeadingTrivia"));
             arguments.Add(escapedTokenValueText);
             arguments.Add(escapedTokenValueText);
@@ -512,7 +541,7 @@ public class Quoter
             valueKind != SyntaxKind.ArgListKeyword &&
             !value.IsMissing)
         {
-            methodName = GetSyntaxFactory("Literal");
+            methodName = SyntaxFactory("Literal");
             var shouldAddTrivia = (leading != null || trailing != null);
             if (shouldAddTrivia)
                 arguments.Add(leading ?? GetEmptyTrivia("LeadingTrivia"));
@@ -521,7 +550,8 @@ public class Quoter
             if (valueKind == SyntaxKind.CharacterLiteralToken) escapedValue = EscapeAndQuote(value.ValueText, "'");
             else if (valueKind != SyntaxKind.StringLiteralToken) escapedValue = value.ValueText;
             else escapedValue = EscapeAndQuote(value.ValueText);
-            if (shouldAddTrivia || (valueKind == SyntaxKind.StringLiteralToken && value.ToString() != SyntaxFactory.Literal(value.ValueText).ToString()))
+            if (shouldAddTrivia ||
+                (valueKind == SyntaxKind.StringLiteralToken && value.ToString() != Microsoft.CodeAnalysis.CSharp.SyntaxFactory.Literal(value.ValueText).ToString()))
                 arguments.Add(escapedText);
             arguments.Add(escapedValue);
             if (shouldAddTrivia)
@@ -530,10 +560,10 @@ public class Quoter
         else
         {
             if (value.IsMissing)
-                methodName = GetSyntaxFactory("MissingToken");
+                methodName = SyntaxFactory("MissingToken");
             else if (valueKind == SyntaxKind.BadToken)
             {
-                methodName = GetSyntaxFactory("BadToken");
+                methodName = SyntaxFactory("BadToken");
                 leading = leading ?? GetEmptyTrivia("LeadingTrivia");
                 trailing = trailing ?? GetEmptyTrivia("TrailingTrivia");
             }
@@ -573,53 +603,35 @@ public class Quoter
 
     private object GetEmptyTrivia(string parentPropertyName)
     {
-        return new ApiCall(parentPropertyName, GetSyntaxFactory("TriviaList"), arguments: null);
+        return new ApiCall(parentPropertyName, SyntaxFactory("TriviaList"), arguments: null);
     }
 
     private ApiCall QuoteTrivia(SyntaxTrivia syntaxTrivia)
     {
-        var factoryMethodName = GetSyntaxFactory("Trivia");
+        var factoryMethodName = SyntaxFactory("Trivia");
         var text = syntaxTrivia.ToString();
         SyntaxKind syntaxKind;
         if (syntaxTrivia.FullSpan.Length == 0 || ((syntaxKind = syntaxTrivia.Kind()) == SyntaxKind.WhitespaceTrivia && UseDefaultFormatting))
             return null;
         PropertyInfo triviaFactoryProperty;
         if (_triviaFactoryProperties.TryGetValue(text, out triviaFactoryProperty) && syntaxKind == ((SyntaxTrivia)triviaFactoryProperty.GetValue(null)).Kind())
-            return (UseDefaultFormatting ? null : new ApiCall(null, GetSyntaxFactory(triviaFactoryProperty.Name)));
-        if (!string.IsNullOrEmpty(text) && string.IsNullOrWhiteSpace(text) && syntaxKind == SyntaxKind.WhitespaceTrivia) factoryMethodName = (UseDefaultFormatting ? null : GetSyntaxFactory("Whitespace"));
-        else if (syntaxKind == SyntaxKind.SingleLineCommentTrivia || syntaxKind == SyntaxKind.MultiLineCommentTrivia) factoryMethodName = GetSyntaxFactory("Comment");
-        else if (syntaxKind == SyntaxKind.SingleLineDocumentationCommentTrivia || syntaxKind == SyntaxKind.MultiLineDocumentationCommentTrivia) factoryMethodName = GetSyntaxFactory("DocumentComment");
-        else if (syntaxKind == SyntaxKind.PreprocessingMessageTrivia) factoryMethodName = GetSyntaxFactory("PreprocessingMessage");
-        else if (syntaxKind == SyntaxKind.DisabledTextTrivia) factoryMethodName = GetSyntaxFactory("DisabledText");
-        else if (syntaxKind == SyntaxKind.DocumentationCommentExteriorTrivia) factoryMethodName = GetSyntaxFactory("DocumentationCommentExterior");
+            return (UseDefaultFormatting ? null : new ApiCall(null, SyntaxFactory(triviaFactoryProperty.Name)));
+        if (!string.IsNullOrEmpty(text) && string.IsNullOrWhiteSpace(text) && syntaxKind == SyntaxKind.WhitespaceTrivia) factoryMethodName = (UseDefaultFormatting ? null : SyntaxFactory("Whitespace"));
+        else if (syntaxKind == SyntaxKind.SingleLineCommentTrivia || syntaxKind == SyntaxKind.MultiLineCommentTrivia) factoryMethodName = SyntaxFactory("Comment");
+        else if (syntaxKind == SyntaxKind.SingleLineDocumentationCommentTrivia || syntaxKind == SyntaxKind.MultiLineDocumentationCommentTrivia) factoryMethodName = SyntaxFactory("DocumentComment");
+        else if (syntaxKind == SyntaxKind.PreprocessingMessageTrivia) factoryMethodName = SyntaxFactory("PreprocessingMessage");
+        else if (syntaxKind == SyntaxKind.DisabledTextTrivia) factoryMethodName = SyntaxFactory("DisabledText");
+        else if (syntaxKind == SyntaxKind.DocumentationCommentExteriorTrivia) factoryMethodName = SyntaxFactory("DocumentationCommentExterior");
         if (factoryMethodName == null)
             return null;
-        var argument = (syntaxTrivia.HasStructure ? (object)QuoteNodeRecurse(syntaxTrivia.GetStructure(), "Structure") : EscapeAndQuote(text));
+        var verbatim = (text.Contains("\r") || text.Contains("\n"));
+        var argument = (syntaxTrivia.HasStructure ? (object)QuoteNodeRecurse(syntaxTrivia.GetStructure(), "Structure") : EscapeAndQuote(text, verbatim: verbatim));
         return new ApiCall(null, factoryMethodName, CreateArgumentList(argument));
     }
 
     #endregion
 
     #region Escape
-
-    public static string EscapeAndQuote(string text, string quoteChar = "\"")
-    {
-        var verbatim = (text.Contains("\n") || text.Contains("\r"));
-        return EscapeAndQuote(text, verbatim, quoteChar);
-    }
-
-    public static string EscapeAndQuote(string text, bool verbatim, string quoteChar = "\"")
-    {
-        //if (text == Environment.NewLine)
-        //    return "Environment.NewLine";
-        //if (text == "\n")
-        //    return "\"\\n\"";
-        //text = Escape(text, verbatim);
-        //text = SurroundWithQuotes(text, quoteChar);
-        //if (verbatim)
-        //    text = "@" + text;
-        return text;
-    }
 
     /// <summary>
     /// Escapes strings to be included within "" using C# escaping rules
@@ -638,10 +650,53 @@ public class Quoter
         return sb.ToString();
     }
 
+    public static string EscapeAndQuote(string text, string quoteChar = "\"")
+    {
+        bool verbatim = (text.Contains("\n") || text.Contains("\r"));
+        return EscapeAndQuote(text, verbatim, quoteChar);
+    }
+
+    public static string EscapeAndQuote(string text, bool verbatim, string quoteChar = "\"")
+    {
+        if (text == Environment.NewLine)
+            return "Environment.NewLine";
+        if (text == "\n")
+            return "\"\\n\"";
+        text = Escape(text, verbatim);
+        text = SurroundWithQuotes(text, quoteChar);
+        if (verbatim)
+            text = "@" + text;
+        return text;
+    }
+
     private static string SurroundWithQuotes(string text, string quoteChar = "\"")
     {
         text = quoteChar + text + quoteChar;
         return text;
+    }
+
+    #endregion
+
+    #region Evaluate
+
+    /// <summary>
+    /// Calls the Roslyn syntax API to actually create the syntax tree object and return the source
+    /// code generated by the syntax tree.
+    /// </summary>
+    /// <param name="apiCallString">Code that calls Roslyn syntax APIs as a string</param>
+    /// <returns>The string that corresponds to the code of the syntax tree.</returns>
+    public string Evaluate(string apiCallString, bool normalizeWhitespace = false)
+    {
+        var generatedNode = CSharpScript.EvaluateAsync<SyntaxNode>(apiCallString, _options).Result;
+        if (normalizeWhitespace)
+            generatedNode = generatedNode.NormalizeWhitespace();
+        var resultText = generatedNode.ToFullString();
+        return resultText;
+    }
+
+    private string Evaluate(ApiCall apiCall, bool normalizeWhitespace = false)
+    {
+        return Evaluate(Print(apiCall), normalizeWhitespace);
     }
 
     #endregion
@@ -651,252 +706,141 @@ public class Quoter
     /// <summary>
     /// Flattens a tree of ApiCalls into a single string.
     /// </summary>
-    public static string ToJson(ApiCall root, bool jsonIndented = false)
+    public string Print(ApiCall root)
     {
-        var sb = new StringBuilder();
-        var sw = new StringWriter(sb);
-        using (var w = new JsonTextWriter(sw))
-        {
-            if (jsonIndented)
-                w.Formatting = Formatting.Indented;
-            ToJsonRecurse(root, w);
-        }
-        return sb.ToString();
+        var b = new StringBuilder();
+        PrintRecurse(root, b, 0, OpenParenthesisOnNewLine, ClosingParenthesisOnNewLine);
+        return b.ToString();
     }
 
-    public static SyntaxNode FromJson(string json)
+    internal static string PrintWithDefaultFormatting(ApiCall root)
     {
-        var r = new JsonTextReader(new StringReader(json));
-        r.Read(); var codeBlock = (SyntaxNode)FromJsonRecurse(r);
-        codeBlock = codeBlock.NormalizeWhitespace();
-        return codeBlock;
+        var b = new StringBuilder();
+        PrintRecurse(root, b, 0, openParenthesisOnNewLine: false, closingParenthesisOnNewLine: false);
+        return b.ToString();
     }
 
-    public static SyntaxNode FromApi(ApiCall root)
+    public static dynamic ToDynamic(ApiCall root)
     {
-        var codeBlock = (SyntaxNode)FromApiRecurse(root);
-        codeBlock = codeBlock.NormalizeWhitespace();
-        return codeBlock;
+        var tree = ToDynamicRecurse(root);
+        return tree;
     }
 
-    private static void ToJsonRecurse(ApiCall codeBlock, JsonTextWriter w)
+    public static ApiCall FromDynamic(dynamic tree)
     {
-        w.WriteStartObject();
-        ToJson(codeBlock.FactoryMethodCall, w);
-        if (codeBlock.InstanceMethodCalls != null)
-        {
-            w.WritePropertyName("b");
-            w.WriteStartArray();
-            foreach (var call in codeBlock.InstanceMethodCalls)
-            {
-                w.WriteStartObject();
-                ToJson(call, w);
-                w.WriteEndObject();
-            }
-            w.WriteEndArray();
-        }
-        w.WriteEndObject();
+        return null;
     }
 
-    private static object FromApiRecurse(ApiCall codeBlock)
+    private static void PrintRecurse(ApiCall codeBlock, StringBuilder b, int depth = 0, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false)
     {
-        var obj = FromApi(null, codeBlock.FactoryMethodCall);
+        Print(codeBlock.FactoryMethodCall, b, depth, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
         if (codeBlock.InstanceMethodCalls != null)
             foreach (var call in codeBlock.InstanceMethodCalls)
-                obj = FromApi(obj, call);
-        return obj;
-    }
-
-    private static object FromJsonRecurse(JsonTextReader r)
-    {
-        if (r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
-        r.Read(); var obj = FromJson(null, r);
-        if (r.TokenType == JsonToken.PropertyName && (string)r.Value == "b")
-        {
-            r.Read(); if (r.TokenType != JsonToken.StartArray) throw new InvalidOperationException();
-            do
             {
-                r.Read(); //if (r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
-                if (r.TokenType == JsonToken.EndArray) break;
-                else { r.Read(); obj = FromJson(obj, r); }
-                //if (r.TokenType != JsonToken.EndObject) throw new InvalidOperationException();
+                PrintNewLine(b);
+                Print(call, b, depth, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
             }
-            while (r.TokenType != JsonToken.EndArray);
-            r.Read();
-        }
-        if (r.TokenType != JsonToken.EndObject) throw new InvalidOperationException();
-        r.Read();
-        return obj;
     }
 
-    internal static void ToJson(MemberCall call, JsonTextWriter w)
+    private static dynamic ToDynamicRecurse(ApiCall codeBlock)
     {
-        w.WritePropertyName(call.Name);
+        var f = ToDynamic(codeBlock.FactoryMethodCall, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses);
+        var ms = (codeBlock.InstanceMethodCalls != null ? codeBlock.InstanceMethodCalls.Select(call => ToDynamic(call, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses)).ToArray() : null);
+        return new
+        {
+            f = f,
+            ms = ms,
+        };
+    }
+
+    internal static void Print(MemberCall call, StringBuilder b, int depth, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false, bool useCurliesInsteadOfParentheses = false)
+    {
+        var openParen = (useCurliesInsteadOfParentheses ? "{" : "(");
+        var closeParen = (useCurliesInsteadOfParentheses ? "}" : ")");
+        Print(call.Name, b, depth);
+
         var methodCall = (call as MethodCall);
-        if (methodCall == null || methodCall.Arguments == null || !methodCall.Arguments.Any())
+        if (methodCall != null)
         {
-            w.WriteValue((string)null);
-            return;
-        }
-        //
-        w.WriteStartArray();
-        foreach (var block in methodCall.Arguments)
-        {
-            if (block is string) w.WriteValue((string)block);
-            else if (block is SyntaxKind) w.WriteValue("k:" + ((SyntaxKind)block).ToString());
-            else if (block is ApiCall) ToJsonRecurse(block as ApiCall, w);
-        }
-        w.WriteEndArray();
-    }
-
-    internal static object FromApi(object obj, MemberCall call)
-    {
-        var callName = call.Name;
-        var methodCall = (call as MethodCall);
-        if (methodCall == null || methodCall.Arguments == null || !methodCall.Arguments.Any())
-            return Evaluate(obj, callName, null);
-        //
-        var args = new List<object>();
-        foreach (var block in methodCall.Arguments)
-        {
-            if (block is string) args.Add(block);
-            else if (block is SyntaxKind) args.Add(block);
-            else if (block is ApiCall) args.Add(FromApiRecurse(block as ApiCall));
-        }
-        return Evaluate(obj, callName, args.ToArray());
-    }
-
-    internal static object FromJson(object obj, JsonTextReader r)
-    {
-        var callName = (r.Value as string); if (r.TokenType != JsonToken.PropertyName) throw new InvalidOperationException();
-        r.Read(); if (r.TokenType == JsonToken.Null)
-        {
-            r.Read();
-            return Evaluate(obj, callName, null);
-        }
-        //
-        if (r.TokenType != JsonToken.StartArray) throw new InvalidOperationException();
-        var args = new List<object>();
-        do
-        {
-            if (r.TokenType != JsonToken.StartObject) r.Read();
-            if (r.TokenType != JsonToken.EndArray && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
-            if (r.TokenType == JsonToken.EndArray) break;
-            else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) args.Add(r.Value);
-            else if (r.TokenType == JsonToken.String) args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2)));
-            else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonRecurse(r));
-        }
-        while (r.TokenType != JsonToken.EndArray);
-        r.Read();
-        return Evaluate(obj, callName, args.ToArray());
-    }
-
-    private static string GetCode(ApiCall call)
-    {
-        var tree = (SyntaxNode)FromApiRecurse(call);
-        return tree.ToFullString();
-    }
-
-    private static object Evaluate(object obj, string text, object[] args)
-    {
-        //Console.WriteLine("{0}{1}({2})", (obj == null ? string.Empty : obj.GetType().ToString() + ": "), text, (args == null ? "null" : string.Join(",", args.Select(x => x.ToString()).ToArray())));
-        // parse generic
-        string genericTypeName;
-        int idx; if ((idx = text.IndexOf("<")) != -1)
-        {
-            genericTypeName = text.Substring(idx + 1, text.Length - idx - 2);
-            text = text.Substring(0, idx);
-        }
-        else genericTypeName = null;
-        //
-        if (text.StartsWith("f:"))
-        {
-            var method = text.Substring(2);
-            if (args == null)
+            if (methodCall.Arguments == null || !methodCall.Arguments.Any())
             {
-                var propertyInfo = GetProperty(_syntaxFactoryType, method, BindingFlags.Public | BindingFlags.Static);
-                if (propertyInfo != null)
-                    return propertyInfo.GetValue(null);
+                Print(openParen + closeParen, b, 0);
+                return;
             }
-            var methodInfo = GetMethod(_syntaxFactoryType, method, genericTypeName, BindingFlags.Public | BindingFlags.Static, ref args);
-            if (methodInfo == null) throw new InvalidOperationException(method);
-            return methodInfo.Invoke(null, args);
+            var needNewLine = true;
+            if (methodCall.Arguments.Count == 1 && (methodCall.Arguments[0] is string || methodCall.Arguments[0] is SyntaxKind))
+                needNewLine = false;
+            if (openParenthesisOnNewLine && needNewLine)
+            {
+                PrintNewLine(b);
+                Print(openParen, b, depth);
+            }
+            else
+                Print(openParen, b, 0);
+            if (needNewLine)
+                PrintNewLine(b);
+            var needComma = false;
+            foreach (var block in methodCall.Arguments)
+            {
+                if (needComma)
+                {
+                    Print(",", b, 0);
+                    PrintNewLine(b);
+                }
+                if (block is string)
+                    Print((string)block, b, needNewLine ? depth + 1 : 0);
+                else if (block is SyntaxKind)
+                    Print("SyntaxKind." + ((SyntaxKind)block).ToString(), b, needNewLine ? depth + 1 : 0);
+                else if (block is ApiCall)
+                    PrintRecurse(block as ApiCall, b, depth + 1, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
+                needComma = true;
+            }
+            if (closingParenthesisOnNewLine && needNewLine)
+            {
+                PrintNewLine(b);
+                Print(closeParen, b, depth);
+            }
+            else
+                Print(closeParen, b, 0);
         }
-        else if (text.StartsWith("w:"))
-        {
-            var method = "With" + text.Substring(2);
-            var methodInfo = GetMethod(obj.GetType(), method, null, BindingFlags.Public | BindingFlags.Instance, ref args);
-            if (methodInfo == null) throw new InvalidOperationException(method);
-            return methodInfo.Invoke(obj, args);
-        }
-        else if (text.StartsWith("k:"))
-        {
-            return Enum.Parse(typeof(SyntaxKind), text.Substring(2));
-        }
-        else if (text.StartsWith("n:"))
-        {
-            // [http://stackoverflow.com/questions/9022059/dynamically-create-an-array-and-set-the-elements]
-            var method = text.Substring(2);
-            var methodType = _syntaxFactoryAssemblyNamespaces.Select(x => _syntaxFactoryAssembly.GetType(x + "." + method)).FirstOrDefault(x => x != null);
-            var array = Array.CreateInstance(methodType, args.Length);
-            for (var i = 0; i < args.Length; i++)
-                array.SetValue(args[i], i);
-            return array;
-        }
-        else
-            throw new ArgumentOutOfRangeException("text", text);
     }
 
-    #endregion
-
-    #region Reflection
-
-    readonly static Type _syntaxFactoryType = typeof(SyntaxFactory);
-    readonly static Assembly _syntaxFactoryAssembly = typeof(SyntaxFactory).Assembly;
-    readonly static string[] _syntaxFactoryAssemblyNamespaces = new[] {
-            "Microsoft.CodeAnalysis.CSharp.Syntax",
-            "Microsoft.CodeAnalysis.CSharp.SyntaxFactory" };
-
-    private static PropertyInfo GetProperty(Type type, string name, BindingFlags flags)
+    internal static dynamic ToDynamic(MemberCall call, bool useCurliesInsteadOfParentheses = false)
     {
-        return type.GetProperty(name, flags);
+        var methodCall = (call as MethodCall);
+        var args = (methodCall != null && methodCall.Arguments != null ? methodCall.Arguments.Select(block =>
+        {
+            if (block is string)
+                return new { text = (string)block };
+            else if (block is SyntaxKind)
+                return new { kind = ((SyntaxKind)block).ToString() };
+            else if (block is ApiCall)
+                return ToDynamicRecurse(block as ApiCall);
+            return null;
+        }).ToArray() : null);
+        return new
+        {
+            name = call.Name,
+            scope = useCurliesInsteadOfParentheses,
+            args = args,
+        };
     }
 
-    private static MethodInfo GetMethod(Type type, string name, string genericTypeName, BindingFlags flags, ref object[] args)
+    internal static void PrintNewLine(StringBuilder sb)
     {
-        var types = (args == null ? new Type[0] : args.Select(x => x.GetType()).ToArray());
-        if (genericTypeName == null)
-        {
-            var quickMethod = type.GetMethod(name, flags, null, types, null);
-            if (quickMethod != null)
-                return quickMethod;
-            var slow = type.GetMethods(flags)
-                .Where(m => !m.IsGenericMethod && m.Name == name)
-                .Select(m => new { m = m, p = m.GetParameters(), pd = m.GetParameters().Where(x => !x.HasDefaultValue).Select(x => x.ParameterType).ToArray() })
-                .Where(m => ((types == null || types.Length == 0) && !m.pd.Any()) || (types != null && m.pd.SequenceEqual(types)))
-                .SingleOrDefault();
-            if (slow == null)
-                throw new InvalidOperationException(name);
-            var p = slow.p;
-            var newArgs = new object[p.Length];
-            var argsLength = (args != null ? args.Length : 0);
-            if (argsLength != 0)
-                Array.Copy(args, newArgs, argsLength);
-            for (var i = argsLength; i < p.Length; i++)
-                newArgs[i] = p[i].DefaultValue;
-            args = newArgs;
-            return slow.m;
-        }
-        //
-        var genericType = _syntaxFactoryAssemblyNamespaces.Select(x => _syntaxFactoryAssembly.GetType(x + "." + genericTypeName)).FirstOrDefault(x => x != null);
-        if (genericType == null) throw new InvalidOperationException(genericTypeName);
-        var genericMethods = type.GetMethods(flags)
-            .Where(m => m.IsGenericMethod && m.ContainsGenericParameters && m.Name == name)
-            .Select(m => new { m = m, p = m.GetParameters(), pt = m.GetParameters().Select(x => x.ParameterType).ToArray() })
-            .Where(m => ((types == null || types.Length == 0) && !m.p.Any()) || (types != null && m.pt.Length == types.Length))
-            .ToList();
-        var genericMethod = genericMethods.SingleOrDefault();
-        return genericMethod.m.GetGenericMethodDefinition().MakeGenericMethod(genericType);
+        sb.AppendLine();
+    }
+
+    internal static void Print(string line, StringBuilder sb, int indent)
+    {
+        PrintIndent(sb, indent);
+        sb.Append(line);
+    }
+
+    internal static void PrintIndent(StringBuilder sb, int indent)
+    {
+        if (indent > 0)
+            sb.Append(new string(' ', indent * 4));
     }
 
     #endregion
