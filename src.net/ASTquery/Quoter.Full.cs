@@ -1,4 +1,4 @@
-﻿#if Full
+﻿#if _Full
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
@@ -720,17 +720,6 @@ public class Quoter
         return b.ToString();
     }
 
-    public static dynamic ToDynamic(ApiCall root)
-    {
-        var tree = ToDynamicRecurse(root);
-        return tree;
-    }
-
-    public static ApiCall FromDynamic(dynamic tree)
-    {
-        return null;
-    }
-
     private static void PrintRecurse(ApiCall codeBlock, StringBuilder b, int depth = 0, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false)
     {
         Print(codeBlock.FactoryMethodCall, b, depth, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
@@ -740,17 +729,6 @@ public class Quoter
                 PrintNewLine(b);
                 Print(call, b, depth, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
             }
-    }
-
-    private static dynamic ToDynamicRecurse(ApiCall codeBlock)
-    {
-        var f = ToDynamic(codeBlock.FactoryMethodCall, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses);
-        var ms = (codeBlock.InstanceMethodCalls != null ? codeBlock.InstanceMethodCalls.Select(call => ToDynamic(call, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses)).ToArray() : null);
-        return new
-        {
-            f = f,
-            ms = ms,
-        };
     }
 
     internal static void Print(MemberCall call, StringBuilder b, int depth, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false, bool useCurliesInsteadOfParentheses = false)
@@ -803,27 +781,6 @@ public class Quoter
             else
                 Print(closeParen, b, 0);
         }
-    }
-
-    internal static dynamic ToDynamic(MemberCall call, bool useCurliesInsteadOfParentheses = false)
-    {
-        var methodCall = (call as MethodCall);
-        var args = (methodCall != null && methodCall.Arguments != null ? methodCall.Arguments.Select(block =>
-        {
-            if (block is string)
-                return new { text = (string)block };
-            else if (block is SyntaxKind)
-                return new { kind = ((SyntaxKind)block).ToString() };
-            else if (block is ApiCall)
-                return ToDynamicRecurse(block as ApiCall);
-            return null;
-        }).ToArray() : null);
-        return new
-        {
-            name = call.Name,
-            scope = useCurliesInsteadOfParentheses,
-            args = args,
-        };
     }
 
     internal static void PrintNewLine(StringBuilder sb)

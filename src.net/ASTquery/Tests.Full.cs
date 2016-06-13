@@ -1,4 +1,4 @@
-﻿#if !_LIB && Full
+﻿#if !_LIB && _Full
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;

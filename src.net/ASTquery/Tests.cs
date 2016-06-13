@@ -1,4 +1,4 @@
-﻿#if !_LIB && !Full
+﻿#if !_LIB && !_Full
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -261,45 +261,6 @@ public class Tests
             }
         }
     }", @"{
-  'f:CompilationUnit': null,
-  'b': [
-    {
-      'w:Members': [
-        {
-          'f:SingletonList<MemberDeclarationSyntax>': [
-            {
-              'f:ClassDeclaration': [
-                {
-                  'f:MissingToken': [
-                    'k:IdentifierToken'
-                  ]
-                }
-              ],
-              'b': [
-                {
-                  'w:Keyword': [
-                    {
-                      'f:Token': [
-                        'k:ClassKeyword'
-                      ]
-                    }
-                  ]
-                },
-                {
-                  'w:OpenBraceToken': [
-                    {
-                      'f:MissingToken': [
-                        'k:OpenBraceToken'
-                      ]
-                    }
-                  ]
-                },
-                {
-                  'w:CloseBraceToken': [
-                    {
-                      'f:MissingToken': [
-                        'k:CloseBraceToken'
-                      ]{
   'f:CompilationUnit': null,
   'b': [
     {
@@ -731,25 +692,6 @@ public class Tests
       ]
     }
   ]
-}
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      'w:EndOfFileToken': [
-        {
-          'f:Token': [
-            'k:EndOfFileToken'
-          ]
-        }
-      ]
-    }
-  ]
 }".Replace("'", "\""), removeRedundantModifyingCalls: false);
     }
 
@@ -1062,12 +1004,12 @@ public class Tests
         if (useJson)
         {
             var generatedCode = quoter.Quote(sourceText);
-            actual = Quoter.FromJson(generatedCode).ToFullString();
+            actual = ApiCall.FromJsonToSyntax(generatedCode).ToFullString();
         }
         else
         {
             var generatedCode = quoter.Parse(sourceText);
-            actual = Quoter.FromApi(generatedCode).ToFullString();
+            actual = generatedCode.ToSyntax().ToFullString();
         }
         //if (sourceText != resultText)
         //{

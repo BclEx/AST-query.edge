@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.CodeAnalysis;
+using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 /// <summary>
@@ -13,10 +16,9 @@ using System.Text;
 public class ApiCall
 {
     public string Name { get; private set; }
-    public MemberCall FactoryMethodCall { get; private set; }
-    public List<MethodCall> InstanceMethodCalls { get; private set; }
-
-    public bool UseCurliesInsteadOfParentheses { get; private set; }
+    public MemberCall FactoryMethodCall { get; internal set; }
+    public List<MethodCall> InstanceMethodCalls { get; internal set; }
+    public bool UseCurliesInsteadOfParentheses { get; internal set; }
 
     public ApiCall()
     {
@@ -31,9 +33,8 @@ public class ApiCall
         };
     }
 
-    public ApiCall(string parentPropertyName, string factoryMethodName, List<object> arguments, bool useCurliesInsteadOfParentheses = false)
+    public ApiCall(string parentPropertyName, string factoryMethodName, List<object> arguments)
     {
-        UseCurliesInsteadOfParentheses = useCurliesInsteadOfParentheses;
         Name = parentPropertyName;
         FactoryMethodCall = new MethodCall
         {
@@ -62,10 +63,55 @@ public class ApiCall
         InstanceMethodCalls.Remove(methodCall);
     }
 
-    //public override string ToString()
-    //{
-    //    return Quoter.PrintWithDefaultFormatting(this);
-    //}
+    #region Convert
+
+    public override string ToString()
+    {
+        return Quoter.Print(this);
+    }
+
+    public string ToFullString()
+    {
+        var tree = (SyntaxNode)Quoter.FromApiRecurse(this);
+        return tree.ToFullString();
+    }
+
+    public SyntaxNode ToSyntax()
+    {
+        var tree = (SyntaxNode)Quoter.FromApiRecurse(this);
+        tree = tree.NormalizeWhitespace();
+        return tree;
+    }
+
+    public string ToJson(bool jsonIndented = false)
+    {
+        var sb = new StringBuilder();
+        var sw = new StringWriter(sb);
+        using (var w = new JsonTextWriter(sw))
+        {
+            if (jsonIndented)
+                w.Formatting = Formatting.Indented;
+            Quoter.ToJsonRecurse(this, w);
+        }
+        return sb.ToString();
+    }
+
+    public static ApiCall FromJson(string json)
+    {
+        var r = new JsonTextReader(new StringReader(json));
+        r.Read(); var codeBlock = (ApiCall)Quoter.FromJsonRecurse(r);
+        return codeBlock;
+    }
+
+    public static SyntaxNode FromJsonToSyntax(string json)
+    {
+        var r = new JsonTextReader(new StringReader(json));
+        r.Read(); var codeBlock = (SyntaxNode)Quoter.FromJsonToSyntaxRecurse(r);
+        codeBlock = codeBlock.NormalizeWhitespace();
+        return codeBlock;
+    }
+
+    #endregion
 }
 
 /// <summary>
@@ -75,12 +121,12 @@ public class MemberCall
 {
     public string Name { get; set; }
 
-    //public override string ToString()
-    //{
-    //    var sb = new StringBuilder();
-    //    Quoter.Print(this, sb, 0);
-    //    return sb.ToString();
-    //}
+    public override string ToString()
+    {
+        var sb = new StringBuilder();
+        Quoter.Print(this, sb, 0);
+        return sb.ToString();
+    }
 }
 
 /// <summary>

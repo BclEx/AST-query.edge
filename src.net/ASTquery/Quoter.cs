@@ -1,4 +1,4 @@
-﻿#if !Full
+﻿#if !_Full
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -112,17 +112,18 @@ public class Quoter
     public string Quote(string sourceText, bool jsonIndented = false)
     {
         var sourceTree = CSharpSyntaxTree.ParseText(sourceText);
-        return ToJson(Parse(sourceTree.GetRoot()), jsonIndented);
+        return Parse(sourceTree.GetRoot()).ToJson(jsonIndented);
     }
 
     public string Quote(SyntaxNode node, bool jsonIndented = false)
     {
         var rootApiCall = QuoteRecurse(node, name: null);
-        return ToJson(rootApiCall, jsonIndented);
+        return rootApiCall.ToJson(jsonIndented);
     }
 
     public ApiCall Parse(string sourceText)
     {
+        //Console.WriteLine(sourceText);
         var sourceTree = CSharpSyntaxTree.ParseText(sourceText);
         return Parse(sourceTree.GetRoot());
     }
@@ -267,9 +268,9 @@ public class Quoter
     {
         if (RemoveRedundantModifyingCalls)
         {
-            var before = GetCode(apiCall);
+            var before = apiCall.ToFullString();
             apiCall.Add(methodCall);
-            var after = GetCode(apiCall);
+            var after = apiCall.ToFullString();
             if (before == after)
                 apiCall.Remove(methodCall);
             return;
@@ -447,7 +448,7 @@ public class Quoter
         else
             elements = new List<object>
             {
-                new ApiCall("methodName", "n:" + listType, elements)
+                new ApiCall("methodName", "n:" + listType, elements) { UseCurliesInsteadOfParentheses = true }
             };
         return new ApiCall(name, methodName, elements);
     }
@@ -646,40 +647,9 @@ public class Quoter
 
     #endregion
 
-    #region Print
+    #region Convert
 
-    /// <summary>
-    /// Flattens a tree of ApiCalls into a single string.
-    /// </summary>
-    public static string ToJson(ApiCall root, bool jsonIndented = false)
-    {
-        var sb = new StringBuilder();
-        var sw = new StringWriter(sb);
-        using (var w = new JsonTextWriter(sw))
-        {
-            if (jsonIndented)
-                w.Formatting = Formatting.Indented;
-            ToJsonRecurse(root, w);
-        }
-        return sb.ToString();
-    }
-
-    public static SyntaxNode FromJson(string json)
-    {
-        var r = new JsonTextReader(new StringReader(json));
-        r.Read(); var codeBlock = (SyntaxNode)FromJsonRecurse(r);
-        codeBlock = codeBlock.NormalizeWhitespace();
-        return codeBlock;
-    }
-
-    public static SyntaxNode FromApi(ApiCall root)
-    {
-        var codeBlock = (SyntaxNode)FromApiRecurse(root);
-        codeBlock = codeBlock.NormalizeWhitespace();
-        return codeBlock;
-    }
-
-    private static void ToJsonRecurse(ApiCall codeBlock, JsonTextWriter w)
+    internal static void ToJsonRecurse(ApiCall codeBlock, JsonTextWriter w)
     {
         w.WriteStartObject();
         ToJson(codeBlock.FactoryMethodCall, w);
@@ -698,7 +668,31 @@ public class Quoter
         w.WriteEndObject();
     }
 
-    private static object FromApiRecurse(ApiCall codeBlock)
+    internal static ApiCall FromJsonRecurse(JsonTextReader r)
+    {
+        if (r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+        r.Read(); var codeBlock = new ApiCall { FactoryMethodCall = FromJson(r) };
+        if (r.TokenType == JsonToken.PropertyName && (string)r.Value == "b")
+        {
+            r.Read(); if (r.TokenType != JsonToken.StartArray) throw new InvalidOperationException();
+            var calls = new List<MethodCall>();
+            do
+            {
+                r.Read(); //if (r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+                if (r.TokenType == JsonToken.EndArray) break;
+                else { r.Read(); calls.Add((MethodCall)FromJson(r)); }
+                //if (r.TokenType != JsonToken.EndObject) throw new InvalidOperationException();
+            }
+            while (r.TokenType != JsonToken.EndArray);
+            r.Read();
+            codeBlock.InstanceMethodCalls = calls;
+        }
+        if (r.TokenType != JsonToken.EndObject) throw new InvalidOperationException();
+        r.Read();
+        return codeBlock;
+    }
+
+    internal static object FromApiRecurse(ApiCall codeBlock)
     {
         var obj = FromApi(null, codeBlock.FactoryMethodCall);
         if (codeBlock.InstanceMethodCalls != null)
@@ -707,10 +701,10 @@ public class Quoter
         return obj;
     }
 
-    private static object FromJsonRecurse(JsonTextReader r)
+    internal static object FromJsonToSyntaxRecurse(JsonTextReader r)
     {
         if (r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
-        r.Read(); var obj = FromJson(null, r);
+        r.Read(); var obj = FromJsonToSyntax(null, r);
         if (r.TokenType == JsonToken.PropertyName && (string)r.Value == "b")
         {
             r.Read(); if (r.TokenType != JsonToken.StartArray) throw new InvalidOperationException();
@@ -718,7 +712,7 @@ public class Quoter
             {
                 r.Read(); //if (r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
                 if (r.TokenType == JsonToken.EndArray) break;
-                else { r.Read(); obj = FromJson(obj, r); }
+                else { r.Read(); obj = FromJsonToSyntax(obj, r); }
                 //if (r.TokenType != JsonToken.EndObject) throw new InvalidOperationException();
             }
             while (r.TokenType != JsonToken.EndArray);
@@ -729,7 +723,7 @@ public class Quoter
         return obj;
     }
 
-    internal static void ToJson(MemberCall call, JsonTextWriter w)
+    private static void ToJson(MemberCall call, JsonTextWriter w)
     {
         w.WritePropertyName(call.Name);
         var methodCall = (call as MethodCall);
@@ -749,7 +743,31 @@ public class Quoter
         w.WriteEndArray();
     }
 
-    internal static object FromApi(object obj, MemberCall call)
+    private static MemberCall FromJson(JsonTextReader r)
+    {
+        var callName = (r.Value as string); if (r.TokenType != JsonToken.PropertyName) throw new InvalidOperationException();
+        r.Read(); if (r.TokenType == JsonToken.Null)
+        {
+            r.Read();
+            return new MemberCall { Name = callName };
+        }
+        //
+        if (r.TokenType != JsonToken.StartArray) throw new InvalidOperationException();
+        r.Read();
+        var args = new List<object>();
+        while (r.TokenType != JsonToken.EndArray)
+        {
+            if (r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+            else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonRecurse(r));
+            else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) { args.Add(r.Value); r.Read(); }
+            else if (r.TokenType == JsonToken.String) { args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2))); r.Read(); }
+            else throw new InvalidOperationException(r.TokenType.ToString());
+        }
+        r.Read();
+        return new MethodCall { Name = callName, Arguments = args };
+    }
+
+    private static object FromApi(object obj, MemberCall call)
     {
         var callName = call.Name;
         var methodCall = (call as MethodCall);
@@ -766,7 +784,7 @@ public class Quoter
         return Evaluate(obj, callName, args.ToArray());
     }
 
-    internal static object FromJson(object obj, JsonTextReader r)
+    private static object FromJsonToSyntax(object obj, JsonTextReader r)
     {
         var callName = (r.Value as string); if (r.TokenType != JsonToken.PropertyName) throw new InvalidOperationException();
         r.Read(); if (r.TokenType == JsonToken.Null)
@@ -776,26 +794,97 @@ public class Quoter
         }
         //
         if (r.TokenType != JsonToken.StartArray) throw new InvalidOperationException();
+        r.Read();
         var args = new List<object>();
-        do
+        while (r.TokenType != JsonToken.EndArray)
         {
-            if (r.TokenType != JsonToken.StartObject) r.Read();
-            if (r.TokenType != JsonToken.EndArray && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
-            if (r.TokenType == JsonToken.EndArray) break;
-            else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) args.Add(r.Value);
-            else if (r.TokenType == JsonToken.String) args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2)));
-            else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonRecurse(r));
+            if (r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+            else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonToSyntaxRecurse(r));
+            else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) { args.Add(r.Value); r.Read(); }
+            else if (r.TokenType == JsonToken.String) { args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2))); r.Read(); }
+            else throw new InvalidOperationException(r.TokenType.ToString());
         }
-        while (r.TokenType != JsonToken.EndArray);
         r.Read();
         return Evaluate(obj, callName, args.ToArray());
     }
 
-    private static string GetCode(ApiCall call)
+    #endregion
+
+    #region Print
+
+    /// <summary>
+    /// Flattens a tree of ApiCalls into a single string.
+    /// </summary>
+    public static string Print(ApiCall root)
     {
-        var tree = (SyntaxNode)FromApiRecurse(call);
-        return tree.ToFullString();
+        var b = new StringBuilder();
+        PrintRecurse(root, b, 0, openParenthesisOnNewLine: false, closingParenthesisOnNewLine: false);
+        return b.ToString();
     }
+
+    private static void PrintRecurse(ApiCall codeBlock, StringBuilder b, int depth = 0, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false)
+    {
+        Print(codeBlock.FactoryMethodCall, b, depth, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
+        if (codeBlock.InstanceMethodCalls != null)
+            foreach (var call in codeBlock.InstanceMethodCalls)
+            {
+                PrintNewLine(b);
+                Print(call, b, depth, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
+            }
+    }
+
+    internal static void Print(MemberCall call, StringBuilder b, int depth, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false, bool useCurliesInsteadOfParentheses = false)
+    {
+        var openParen = (useCurliesInsteadOfParentheses ? "{" : "(");
+        var closeParen = (useCurliesInsteadOfParentheses ? "}" : ")");
+        Print(call.Name, b, depth);
+
+        var methodCall = (call as MethodCall);
+        if (methodCall != null)
+        {
+            if (methodCall.Arguments == null || !methodCall.Arguments.Any())
+            {
+                Print(openParen + closeParen, b, 0);
+                return;
+            }
+            var needNewLine = (methodCall.Arguments.Count == 1 && (methodCall.Arguments[0] is string || methodCall.Arguments[0] is SyntaxKind) ? false : true);
+            if (openParenthesisOnNewLine && needNewLine) { PrintNewLine(b); Print(openParen, b, depth); }
+            else Print(openParen, b, 0);
+            if (needNewLine) PrintNewLine(b);
+            var needComma = false;
+            foreach (var block in methodCall.Arguments)
+            {
+                if (needComma) { Print(",", b, 0); PrintNewLine(b); }
+                if (block is string) Print((string)block, b, needNewLine ? depth + 1 : 0);
+                else if (block is SyntaxKind) Print("SyntaxKind." + ((SyntaxKind)block).ToString(), b, needNewLine ? depth + 1 : 0);
+                else if (block is ApiCall) PrintRecurse(block as ApiCall, b, depth + 1, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
+                needComma = true;
+            }
+            if (closingParenthesisOnNewLine && needNewLine) { PrintNewLine(b); Print(closeParen, b, depth); }
+            else Print(closeParen, b, 0);
+        }
+    }
+
+    internal static void PrintNewLine(StringBuilder sb)
+    {
+        sb.AppendLine();
+    }
+
+    internal static void Print(string line, StringBuilder sb, int indent)
+    {
+        PrintIndent(sb, indent);
+        sb.Append(line);
+    }
+
+    internal static void PrintIndent(StringBuilder sb, int indent)
+    {
+        if (indent > 0)
+            sb.Append(new string(' ', indent * 4));
+    }
+
+    #endregion
+
+    #region Evaluate
 
     private static object Evaluate(object obj, string text, object[] args)
     {
@@ -818,6 +907,14 @@ public class Quoter
                 if (propertyInfo != null)
                     return propertyInfo.GetValue(null);
             }
+            else if (method == "Block")
+                if (args.Length == 1) return SyntaxFactory.Block(((SyntaxList<StatementSyntax>)args[0])[0]);
+                else return SyntaxFactory.Block(args.Cast<StatementSyntax>().ToArray());
+            else if (method == "Token") //: not needed
+                if (args.Length == 1) return SyntaxFactory.Token((SyntaxKind)args[0]);
+                else if (args.Length == 3) return SyntaxFactory.Token((SyntaxTriviaList)args[0], (SyntaxKind)args[1], (SyntaxTriviaList)args[2]);
+                else if (args.Length == 5) return SyntaxFactory.Token((SyntaxTriviaList)args[0], (SyntaxKind)args[1], (string)args[2], (string)args[3], (SyntaxTriviaList)args[4]);
+                else throw new InvalidOperationException();
             var methodInfo = GetMethod(_syntaxFactoryType, method, genericTypeName, BindingFlags.Public | BindingFlags.Static, ref args);
             if (methodInfo == null) throw new InvalidOperationException(method);
             return methodInfo.Invoke(null, args);
@@ -837,7 +934,17 @@ public class Quoter
         {
             // [http://stackoverflow.com/questions/9022059/dynamically-create-an-array-and-set-the-elements]
             var method = text.Substring(2);
-            var methodType = _syntaxFactoryAssemblyNamespaces.Select(x => _syntaxFactoryAssembly.GetType(x + "." + method)).FirstOrDefault(x => x != null);
+            if (method == "SyntaxNodeOrToken")
+            {
+                var array2 = new SyntaxNodeOrToken[args.Length];
+                for (var i = 0; i < args.Length; i++)
+                    if (args[i] is SyntaxNode) array2[i] = (SyntaxNode)args[i];
+                    else if (args[i] is SyntaxToken) array2[i] = (SyntaxToken)args[i];
+                    else throw new InvalidOperationException();
+                return array2;
+            }
+            var methodType = GetTypeFromAssemblyScan(method);
+            if (methodType == null) throw new InvalidOperationException(method);
             var array = Array.CreateInstance(methodType, args.Length);
             for (var i = 0; i < args.Length; i++)
                 array.SetValue(args[i], i);
@@ -852,10 +959,21 @@ public class Quoter
     #region Reflection
 
     readonly static Type _syntaxFactoryType = typeof(SyntaxFactory);
-    readonly static Assembly _syntaxFactoryAssembly = typeof(SyntaxFactory).Assembly;
-    readonly static string[] _syntaxFactoryAssemblyNamespaces = new[] {
-            "Microsoft.CodeAnalysis.CSharp.Syntax",
-            "Microsoft.CodeAnalysis.CSharp.SyntaxFactory" };
+    readonly static Tuple<Assembly, string[]>[] _assemblyScans = {
+        new Tuple<Assembly, string[]>(typeof(SyntaxFactory).Assembly, new[] { "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.CSharp.Syntax" }),
+        //new Tuple<Assembly, string[]>(typeof(SyntaxNodeOrToken).Assembly, new[] { "Microsoft.CodeAnalysis" })
+    };
+
+    private static Type GetTypeFromAssemblyScan(string name)
+    {
+        foreach (var assemblyScan in _assemblyScans)
+        {
+            var foundType = assemblyScan.Item2.Select(x => assemblyScan.Item1.GetType(x + "." + name)).FirstOrDefault(x => x != null);
+            if (foundType != null)
+                return foundType;
+        }
+        return null;
+    }
 
     private static PropertyInfo GetProperty(Type type, string name, BindingFlags flags)
     {
@@ -870,14 +988,19 @@ public class Quoter
             var quickMethod = type.GetMethod(name, flags, null, types, null);
             if (quickMethod != null)
                 return quickMethod;
-            var slow = type.GetMethods(flags)
-                .Where(m => !m.IsGenericMethod && m.Name == name)
-                .Select(m => new { m = m, p = m.GetParameters(), pd = m.GetParameters().Where(x => !x.HasDefaultValue).Select(x => x.ParameterType).ToArray() })
-                .Where(m => ((types == null || types.Length == 0) && !m.pd.Any()) || (types != null && m.pd.SequenceEqual(types)))
-                .SingleOrDefault();
-            if (slow == null)
+            var slowMethods = type.GetMethods(flags).Where(m => !m.IsGenericMethod && m.Name == name)
+                .Select(m => new { m = m, p = m.GetParameters(), pt = m.GetParameters().Where(x => !x.HasDefaultValue).Select(x => x.ParameterType).ToArray() })
+                .ToList();
+            if (slowMethods.Count > 1)
+                slowMethods = slowMethods.Where(m => ((types == null || types.Length == 0) && !m.p.Any()) || (types != null && m.pt.Length == types.Length))
+                    .ToList();
+            if (slowMethods.Count > 1)
+                slowMethods = slowMethods.Where(m => types != null && m.pt.SequenceEqual(types, TypeCastableCompare.Default))
+                    .ToList();
+            var slowMethod = slowMethods.SingleOrDefault();
+            if (slowMethod == null)
                 throw new InvalidOperationException(name);
-            var p = slow.p;
+            var p = slowMethod.p;
             var newArgs = new object[p.Length];
             var argsLength = (args != null ? args.Length : 0);
             if (argsLength != 0)
@@ -885,18 +1008,29 @@ public class Quoter
             for (var i = argsLength; i < p.Length; i++)
                 newArgs[i] = p[i].DefaultValue;
             args = newArgs;
-            return slow.m;
+            return slowMethod.m;
         }
         //
-        var genericType = _syntaxFactoryAssemblyNamespaces.Select(x => _syntaxFactoryAssembly.GetType(x + "." + genericTypeName)).FirstOrDefault(x => x != null);
+        var genericType = _assemblyScans[0].Item2.Select(x => _assemblyScans[0].Item1.GetType(x + "." + genericTypeName)).FirstOrDefault(x => x != null);
         if (genericType == null) throw new InvalidOperationException(genericTypeName);
-        var genericMethods = type.GetMethods(flags)
-            .Where(m => m.IsGenericMethod && m.ContainsGenericParameters && m.Name == name)
+        var genericMethods = type.GetMethods(flags).Where(m => m.IsGenericMethod && m.ContainsGenericParameters && m.Name == name)
             .Select(m => new { m = m, p = m.GetParameters(), pt = m.GetParameters().Select(x => x.ParameterType).ToArray() })
-            .Where(m => ((types == null || types.Length == 0) && !m.p.Any()) || (types != null && m.pt.Length == types.Length))
             .ToList();
-        var genericMethod = genericMethods.SingleOrDefault();
-        return genericMethod.m.GetGenericMethodDefinition().MakeGenericMethod(genericType);
+        if (genericMethods.Count > 1)
+            genericMethods = genericMethods.Where(m => ((types == null || types.Length == 0) && !m.p.Any()) || (types != null && m.pt.Length == types.Length))
+                 .ToList();
+        if (genericMethods.Count > 1)
+            genericMethods = genericMethods.Where(m => types != null && m.pt.SequenceEqual(types, TypeCastableCompare.Default))
+                 .ToList();
+        var genericMethod = genericMethods.Select(x => x.m).SingleOrDefault();
+        return genericMethod.GetGenericMethodDefinition().MakeGenericMethod(genericType);
+    }
+
+    class TypeCastableCompare : IEqualityComparer<Type>
+    {
+        public static TypeCastableCompare Default = new TypeCastableCompare();
+        public bool Equals(Type x, Type y) { return (x.IsAssignableFrom(y) || y.IsAssignableFrom(x)); }
+        public int GetHashCode(Type a) { return a.GetHashCode(); }
     }
 
     #endregion

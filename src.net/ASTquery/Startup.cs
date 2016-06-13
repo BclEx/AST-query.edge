@@ -1,4 +1,4 @@
-﻿#if !Full
+﻿#if !_Full
 using System.Threading.Tasks;
 
 namespace ASTquery
@@ -9,7 +9,7 @@ namespace ASTquery
         {
             var quoter = new Quoter();
             var tree = quoter.Parse((string)input);
-            return Quoter.ToJson(tree);
+            return tree.ToJson();
         }
 
         public async Task<object> Generate(object input)
@@ -17,7 +17,7 @@ namespace ASTquery
             var json = (string)input;
             if (json == null)
                 return null;
-            var tree = Quoter.FromJson(json);
+            var tree = ApiCall.FromJsonToSyntax(json);
             return tree.ToFullString();
         }
     }
