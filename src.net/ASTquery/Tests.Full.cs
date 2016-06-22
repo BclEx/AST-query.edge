@@ -522,13 +522,13 @@ class C { }");
 
     private void Test(string sourceText, string expected, bool useDefaultFormatting = true, bool removeRedundantModifyingCalls = true, bool shortenCodeWithUsingStatic = false)
     {
-        var quoter = new Quoter
+        var builder = new SyntaxBuilder
         {
             UseDefaultFormatting = useDefaultFormatting,
             RemoveRedundantModifyingCalls = removeRedundantModifyingCalls,
             ShortenCodeWithUsingStatic = shortenCodeWithUsingStatic
         };
-        var actual = quoter.Quote(sourceText);
+        var actual = builder.Quote(sourceText);
         Assert.AreEqual(expected, actual);
         Test(sourceText);
     }
@@ -544,13 +544,13 @@ class C { }");
         if (useDefaultFormatting)
             sourceText = CSharpSyntaxTree.ParseText(sourceText).GetRoot()
                 .NormalizeWhitespace().ToFullString();
-        var quoter = new Quoter
+        var builder = new SyntaxBuilder
         {
             UseDefaultFormatting = useDefaultFormatting,
             RemoveRedundantModifyingCalls = removeRedundantCalls
         };
-        var generatedCode = quoter.Quote(sourceText);
-        var resultText = quoter.Evaluate(generatedCode);
+        var generatedCode = builder.Quote(sourceText);
+        var resultText = builder.Evaluate(generatedCode);
         //if (sourceText != resultText)
         //{
         //    //File.WriteAllText(@"D:\1.txt", sourceText);

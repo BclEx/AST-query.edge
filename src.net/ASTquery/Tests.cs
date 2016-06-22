@@ -974,7 +974,7 @@ public class Tests
 
     private void Test1(string sourceText, string expected, bool useDefaultFormatting = true, bool removeRedundantModifyingCalls = true)
     {
-        var quoter = new Quoter
+        var quoter = new SyntaxBuilder
         {
             UseDefaultFormatting = useDefaultFormatting,
             RemoveRedundantModifyingCalls = removeRedundantModifyingCalls,
@@ -995,7 +995,7 @@ public class Tests
         if (useDefaultFormatting)
             sourceText = CSharpSyntaxTree.ParseText(sourceText).GetRoot()
                 .NormalizeWhitespace().ToFullString();
-        var quoter = new Quoter
+        var quoter = new SyntaxBuilder
         {
             UseDefaultFormatting = useDefaultFormatting,
             RemoveRedundantModifyingCalls = removeRedundantCalls
@@ -1004,7 +1004,7 @@ public class Tests
         if (useJson)
         {
             var generatedCode = quoter.Quote(sourceText);
-            actual = ApiCall.FromJsonToSyntax(generatedCode).ToFullString();
+            actual = Node.FromJsonToSyntax(generatedCode).ToFullString();
         }
         else
         {

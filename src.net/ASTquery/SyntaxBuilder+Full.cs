@@ -11,7 +11,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-public class Quoter
+public class SyntaxBuilder
 {
     public bool OpenParenthesisOnNewLine { get; set; }
     public bool ClosingParenthesisOnNewLine { get; set; }
@@ -115,7 +115,7 @@ public class Quoter
 
     #endregion
 
-    public Quoter()
+    public SyntaxBuilder()
     {
         UseDefaultFormatting = true;
         RemoveRedundantModifyingCalls = true;
@@ -135,13 +135,13 @@ public class Quoter
         return Print(rootApiCall);
     }
 
-    public ApiCall Parse(string sourceText)
+    public Node Parse(string sourceText)
     {
         var sourceTree = CSharpSyntaxTree.ParseText(sourceText);
         return Parse(sourceTree.GetRoot());
     }
 
-    public ApiCall Parse(SyntaxNode node)
+    public Node Parse(SyntaxNode node)
     {
         Console.WriteLine(node.ToString());
         var rootApiCall = QuoteRecurse(node, name: null);
@@ -173,7 +173,7 @@ public class Quoter
     /// <summary>
     /// Finds a value in a list using case-insensitive search
     /// </summary>
-    private ApiCall FindValue(string parameterName, IEnumerable<ApiCall> values)
+    private Node FindValue(string parameterName, IEnumerable<Node> values)
     {
         return values.FirstOrDefault(v => parameterName.Equals(v.Name, StringComparison.OrdinalIgnoreCase));
     }
@@ -182,7 +182,7 @@ public class Quoter
 
     #region Recurse
 
-    private ApiCall QuoteRecurse(object treeElement, string name = null)
+    private Node QuoteRecurse(object treeElement, string name = null)
     {
         if (treeElement is SyntaxTrivia)
             return QuoteTrivia((SyntaxTrivia)treeElement);
@@ -199,7 +199,7 @@ public class Quoter
     /// <summary>
     /// The main recursive method that given a SyntaxNode recursively quotes the entire subtree.
     /// </summary>
-    private ApiCall QuoteNodeRecurse(SyntaxNode node, string name)
+    private Node QuoteNodeRecurse(SyntaxNode node, string name)
     {
         var quotedPropertyValues = QuotePropertyValues(node);
         var factoryMethod = PickFactoryMethodToCreateNode(node);
@@ -207,7 +207,7 @@ public class Quoter
         if (!ShortenCodeWithUsingStatic)
             factoryMethodName = factoryMethod.DeclaringType.Name + "." + factoryMethodName;
         var factoryMethodCall = new MethodCall { Name = factoryMethodName };
-        var codeBlock = new ApiCall(name, factoryMethodCall);
+        var codeBlock = new Node(name, factoryMethodCall);
         AddFactoryMethodArguments(factoryMethod, factoryMethodCall, quotedPropertyValues);
         AddModifyingCalls(node, codeBlock, quotedPropertyValues);
         return codeBlock;
@@ -262,7 +262,7 @@ public class Quoter
     /// <summary>
     /// Adds information about subsequent modifying fluent interface style calls on an object (like foo.With(...).With(...))
     /// </summary>
-    private void AddModifyingCalls(object treeElement, ApiCall apiCall, List<ApiCall> values)
+    private void AddModifyingCalls(object treeElement, Node apiCall, List<Node> values)
     {
         var methods = treeElement.GetType()
             .GetMethods(BindingFlags.Public | BindingFlags.Instance)
@@ -290,7 +290,7 @@ public class Quoter
         return char.ToUpperInvariant(str[0]) + str.Substring(1);
     }
 
-    private void AddModifyingCall(ApiCall apiCall, MethodCall methodCall)
+    private void AddModifyingCall(Node apiCall, MethodCall methodCall)
     {
         if (RemoveRedundantModifyingCalls)
         {
@@ -309,9 +309,9 @@ public class Quoter
     /// creates API call descriptions for the property values recursively. Properties that are not
     /// essential to the shape of the syntax tree (such as Span) are ignored.
     /// </summary>
-    private List<ApiCall> QuotePropertyValues(SyntaxNode node)
+    private List<Node> QuotePropertyValues(SyntaxNode node)
     {
-        var result = new List<ApiCall>();
+        var result = new List<Node>();
         // get properties and filter out non-essential properties listed in nonStructuralProperties
         var properties = node.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
         result.AddRange(properties
@@ -338,7 +338,7 @@ public class Quoter
             node is PrefixUnaryExpressionSyntax ||
             node is DocumentationCommentTriviaSyntax ||
             node is YieldStatementSyntax)
-            result.Add(new ApiCall("Kind", "SyntaxKind." + node.Kind().ToString()));
+            result.Add(new Node("Kind", "SyntaxKind." + node.Kind().ToString()));
         return result;
     }
 
@@ -346,7 +346,7 @@ public class Quoter
     /// Parse the value of the property <paramref name="property"/> of object <paramref
     /// name="node"/>
     /// </summary>
-    private ApiCall QuotePropertyValue(SyntaxNode node, PropertyInfo property)
+    private Node QuotePropertyValue(SyntaxNode node, PropertyInfo property)
     {
         var value = property.GetValue(node, null);
         var propertyType = property.PropertyType;
@@ -364,14 +364,14 @@ public class Quoter
         {
             var text = value.ToString();
             var verbatim = text.Contains("\r") || text.Contains("\n");
-            return new ApiCall(property.Name, EscapeAndQuote(text, verbatim));
+            return new Node(property.Name, EscapeAndQuote(text, verbatim));
         }
         if (value is bool)
-            return new ApiCall(property.Name, value.ToString().ToLowerInvariant());
+            return new Node(property.Name, value.ToString().ToLowerInvariant());
         return null;
     }
 
-    private void AddFactoryMethodArguments(MethodInfo factory, MethodCall factoryMethodCall, List<ApiCall> quotedValues)
+    private void AddFactoryMethodArguments(MethodInfo factory, MethodCall factoryMethodCall, List<Node> quotedValues)
     {
         foreach (var factoryMethodParameter in factory.GetParameters())
         {
@@ -384,7 +384,7 @@ public class Quoter
                 var methodCall = (quotedCodeBlock.FactoryMethodCall as MethodCall);
                 if (methodCall != null && methodCall.Name.Contains("List") && methodCall.Arguments.Count == 1)
                 {
-                    var argument = (methodCall.Arguments[0] as ApiCall);
+                    var argument = (methodCall.Arguments[0] as Node);
                     var arrayCreation = (argument.FactoryMethodCall as MethodCall);
                     if (argument != null && arrayCreation != null && arrayCreation.Name.StartsWith("new ") && arrayCreation.Name.EndsWith("[]"))
                     {
@@ -432,7 +432,7 @@ public class Quoter
         }
     }
 
-    private ApiCall QuoteList(IEnumerable syntaxList, string name)
+    private Node QuoteList(IEnumerable syntaxList, string name)
     {
         var sourceList = syntaxList.Cast<object>();
         var methodName = SyntaxFactory("List");
@@ -473,16 +473,16 @@ public class Quoter
         else
             elements = new List<object>
             {
-                new ApiCall("methodName", "new " + listType + "[]", elements, useCurliesInsteadOfParentheses: true)
+                new Node("methodName", "new " + listType + "[]", elements) { UseCurliesInsteadOfParentheses = true }
             };
-        return new ApiCall(name, methodName, elements);
+        return new Node(name, methodName, elements);
     }
 
     #endregion
 
     #region Token
 
-    private ApiCall QuoteToken(SyntaxToken value, string name)
+    private Node QuoteToken(SyntaxToken value, string name)
     {
         SyntaxKind valueKind;
         if (value == default(SyntaxToken) || (valueKind = value.Kind()) == SyntaxKind.None)
@@ -572,7 +572,7 @@ public class Quoter
             arguments.Add(tokenValue);
             AddIfNotNull(arguments, trailing);
         }
-        return new ApiCall(name, methodName, arguments);
+        return new Node(name, methodName, arguments);
     }
 
     #endregion
@@ -603,10 +603,10 @@ public class Quoter
 
     private object GetEmptyTrivia(string parentPropertyName)
     {
-        return new ApiCall(parentPropertyName, SyntaxFactory("TriviaList"), arguments: null);
+        return new Node(parentPropertyName, SyntaxFactory("TriviaList"), arguments: null);
     }
 
-    private ApiCall QuoteTrivia(SyntaxTrivia syntaxTrivia)
+    private Node QuoteTrivia(SyntaxTrivia syntaxTrivia)
     {
         var factoryMethodName = SyntaxFactory("Trivia");
         var text = syntaxTrivia.ToString();
@@ -615,7 +615,7 @@ public class Quoter
             return null;
         PropertyInfo triviaFactoryProperty;
         if (_triviaFactoryProperties.TryGetValue(text, out triviaFactoryProperty) && syntaxKind == ((SyntaxTrivia)triviaFactoryProperty.GetValue(null)).Kind())
-            return (UseDefaultFormatting ? null : new ApiCall(null, SyntaxFactory(triviaFactoryProperty.Name)));
+            return (UseDefaultFormatting ? null : new Node(null, SyntaxFactory(triviaFactoryProperty.Name)));
         if (!string.IsNullOrEmpty(text) && string.IsNullOrWhiteSpace(text) && syntaxKind == SyntaxKind.WhitespaceTrivia) factoryMethodName = (UseDefaultFormatting ? null : SyntaxFactory("Whitespace"));
         else if (syntaxKind == SyntaxKind.SingleLineCommentTrivia || syntaxKind == SyntaxKind.MultiLineCommentTrivia) factoryMethodName = SyntaxFactory("Comment");
         else if (syntaxKind == SyntaxKind.SingleLineDocumentationCommentTrivia || syntaxKind == SyntaxKind.MultiLineDocumentationCommentTrivia) factoryMethodName = SyntaxFactory("DocumentComment");
@@ -626,7 +626,7 @@ public class Quoter
             return null;
         var verbatim = (text.Contains("\r") || text.Contains("\n"));
         var argument = (syntaxTrivia.HasStructure ? (object)QuoteNodeRecurse(syntaxTrivia.GetStructure(), "Structure") : EscapeAndQuote(text, verbatim: verbatim));
-        return new ApiCall(null, factoryMethodName, CreateArgumentList(argument));
+        return new Node(null, factoryMethodName, CreateArgumentList(argument));
     }
 
     #endregion
@@ -694,7 +694,7 @@ public class Quoter
         return resultText;
     }
 
-    private string Evaluate(ApiCall apiCall, bool normalizeWhitespace = false)
+    private string Evaluate(Node apiCall, bool normalizeWhitespace = false)
     {
         return Evaluate(Print(apiCall), normalizeWhitespace);
     }
@@ -706,21 +706,21 @@ public class Quoter
     /// <summary>
     /// Flattens a tree of ApiCalls into a single string.
     /// </summary>
-    public string Print(ApiCall root)
+    public string Print(Node root)
     {
         var b = new StringBuilder();
         PrintRecurse(root, b, 0, OpenParenthesisOnNewLine, ClosingParenthesisOnNewLine);
         return b.ToString();
     }
 
-    internal static string PrintWithDefaultFormatting(ApiCall root)
+    internal static string PrintWithDefaultFormatting(Node root)
     {
         var b = new StringBuilder();
         PrintRecurse(root, b, 0, openParenthesisOnNewLine: false, closingParenthesisOnNewLine: false);
         return b.ToString();
     }
 
-    private static void PrintRecurse(ApiCall codeBlock, StringBuilder b, int depth = 0, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false)
+    private static void PrintRecurse(Node codeBlock, StringBuilder b, int depth = 0, bool openParenthesisOnNewLine = false, bool closingParenthesisOnNewLine = false)
     {
         Print(codeBlock.FactoryMethodCall, b, depth, useCurliesInsteadOfParentheses: codeBlock.UseCurliesInsteadOfParentheses, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
         if (codeBlock.InstanceMethodCalls != null)
@@ -769,8 +769,8 @@ public class Quoter
                     Print((string)block, b, needNewLine ? depth + 1 : 0);
                 else if (block is SyntaxKind)
                     Print("SyntaxKind." + ((SyntaxKind)block).ToString(), b, needNewLine ? depth + 1 : 0);
-                else if (block is ApiCall)
-                    PrintRecurse(block as ApiCall, b, depth + 1, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
+                else if (block is Node)
+                    PrintRecurse(block as Node, b, depth + 1, openParenthesisOnNewLine: openParenthesisOnNewLine, closingParenthesisOnNewLine: closingParenthesisOnNewLine);
                 needComma = true;
             }
             if (closingParenthesisOnNewLine && needNewLine)

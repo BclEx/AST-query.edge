@@ -13,18 +13,18 @@ using System.Text;
 /// Data structure to represent code (API calls) of simple hierarchical shape such as:
 /// A.B(C, D.E(F(G, H), I))
 /// </example>
-public class ApiCall
+public class Node
 {
     public string Name { get; private set; }
     public MemberCall FactoryMethodCall { get; internal set; }
     public List<MethodCall> InstanceMethodCalls { get; internal set; }
     public bool UseCurliesInsteadOfParentheses { get; internal set; }
 
-    public ApiCall()
+    public Node()
     {
     }
 
-    public ApiCall(string parentPropertyName, string factoryMethodName)
+    public Node(string parentPropertyName, string factoryMethodName)
     {
         Name = parentPropertyName;
         FactoryMethodCall = new MemberCall
@@ -33,7 +33,7 @@ public class ApiCall
         };
     }
 
-    public ApiCall(string parentPropertyName, string factoryMethodName, List<object> arguments)
+    public Node(string parentPropertyName, string factoryMethodName, List<object> arguments)
     {
         Name = parentPropertyName;
         FactoryMethodCall = new MethodCall
@@ -43,7 +43,7 @@ public class ApiCall
         };
     }
 
-    public ApiCall(string name, MethodCall factoryMethodCall)
+    public Node(string name, MethodCall factoryMethodCall)
     {
         Name = name;
         FactoryMethodCall = factoryMethodCall;
@@ -64,21 +64,37 @@ public class ApiCall
     }
 
     #region Convert
+#if !_Full
 
     public override string ToString()
     {
-        return Quoter.Print(this);
+        return SyntaxBuilder.Print(this);
     }
 
     public string ToFullString()
     {
-        var tree = (SyntaxNode)Quoter.FromApiRecurse(this);
-        return tree.ToFullString();
+        var tree = (SyntaxNode)SyntaxBuilder.FromApiRecurse(this);
+        tree = tree.NormalizeWhitespace();
+        return InternalReplace(tree.ToFullString());
+    }
+
+    public static string ToFullString(SyntaxNode node)
+    {
+        return InternalReplace(node.ToFullString());
+    }
+
+    private static string InternalReplace(string text)
+    {
+        return text.Replace(@"
+    {
+        get;
+        set;
+    }", " { get; set; }");
     }
 
     public SyntaxNode ToSyntax()
     {
-        var tree = (SyntaxNode)Quoter.FromApiRecurse(this);
+        var tree = (SyntaxNode)SyntaxBuilder.FromApiRecurse(this);
         tree = tree.NormalizeWhitespace();
         return tree;
     }
@@ -91,26 +107,27 @@ public class ApiCall
         {
             if (jsonIndented)
                 w.Formatting = Formatting.Indented;
-            Quoter.ToJsonRecurse(this, w);
+            SyntaxBuilder.ToJsonRecurse(this, w);
         }
         return sb.ToString();
     }
 
-    public static ApiCall FromJson(string json)
+    public static Node FromJson(string json)
     {
         var r = new JsonTextReader(new StringReader(json));
-        r.Read(); var codeBlock = (ApiCall)Quoter.FromJsonRecurse(r);
+        r.Read(); var codeBlock = (Node)SyntaxBuilder.FromJsonRecurse(r);
         return codeBlock;
     }
 
     public static SyntaxNode FromJsonToSyntax(string json)
     {
         var r = new JsonTextReader(new StringReader(json));
-        r.Read(); var codeBlock = (SyntaxNode)Quoter.FromJsonToSyntaxRecurse(r);
+        r.Read(); var codeBlock = (SyntaxNode)SyntaxBuilder.FromJsonToSyntaxRecurse(r);
         codeBlock = codeBlock.NormalizeWhitespace();
         return codeBlock;
     }
 
+#endif
     #endregion
 }
 
@@ -124,7 +141,7 @@ public class MemberCall
     public override string ToString()
     {
         var sb = new StringBuilder();
-        Quoter.Print(this, sb, 0);
+        SyntaxBuilder.Print(this, sb, 0);
         return sb.ToString();
     }
 }
