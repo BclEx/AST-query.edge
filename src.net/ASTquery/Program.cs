@@ -53,10 +53,11 @@ namespace QuoterHost
             //var alters = NodeAlter.FromJson(jsonAst);
 
             var sourceText = @"
-namespace Name {
-            class Test {
-public string Field {get;set;}
-            }}";
+class Test
+{
+    [DisplayName(""Name""), Required]
+    public string Field { get; }
+}";
 
             var sourceNode = (CSharpSyntaxTree.ParseText(sourceText).GetRoot() as CSharpSyntaxNode);
 #if _Full

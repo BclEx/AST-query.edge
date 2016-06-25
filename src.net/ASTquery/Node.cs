@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -85,11 +86,68 @@ public class Node
 
     private static string InternalReplace(string text)
     {
-        return text.Replace(@"
-    {
-        get;
-        set;
-    }", " { get; set; }");
+        int offset, nextIdx = 0;
+        while (nextIdx < text.Length)
+        {
+            var getIdx = text.IndexOf("get;", nextIdx); var setIdx = text.IndexOf("set;", nextIdx);
+            var minIdx = (getIdx != -1 && setIdx != -1 ? Math.Min(getIdx, setIdx) : Math.Max(getIdx, setIdx)); var maxIdx = Math.Max(getIdx, setIdx);
+            if (minIdx == -1) break; //: EXIT
+            var startIdx = text.LastIndexOf("{", minIdx); var endIdx = text.IndexOf("}", minIdx);
+            nextIdx += 4;
+            if (startIdx == -1 || endIdx == -1) continue; // SKIP: should be surrounded
+            if (maxIdx > endIdx)
+                maxIdx = minIdx; // OUTSIDE: next token outside of scope
+
+            // remove start to first token
+            //string.Format("a: {0}-{1}:{2} | g:{3} s:{4}", startIdx, endIdx, nextIdx, minIdx, maxIdx).Dump();
+            offset = minIdx - startIdx - 1;
+            // Console.WriteLine("a: [" + text.Substring(startIdx + 1, offset) + "]");
+            if (string.IsNullOrWhiteSpace(text.Substring(startIdx + 1, offset)))
+            {
+                text = text.Remove(startIdx + 1, offset--).Insert(startIdx + 1, " "); // remove whitespace
+                minIdx -= offset; maxIdx -= offset; endIdx -= offset; // adjust indexs
+                nextIdx = (maxIdx > 0 ? maxIdx : endIdx);
+            }
+
+            // remove last token to next token
+            //string.Format("b: {0}-{1}:{2} | g:{3} s:{4}", startIdx, endIdx, nextIdx, minIdx, maxIdx).Dump();
+            if (maxIdx > minIdx)
+            {
+                offset = maxIdx - minIdx - 4;
+                // Console.WriteLine("b: [" + text.Substring(minIdx + 4, offset) + "]");
+                if (string.IsNullOrWhiteSpace(text.Substring(minIdx + 4, offset)))
+                {
+                    text = text.Remove(minIdx + 4, offset--).Insert(minIdx + 4, " "); // remove whitespace
+                    maxIdx -= offset; endIdx -= offset; // adjust indexs
+                }
+                nextIdx = maxIdx;
+            }
+
+            // remove last token to end
+            //string.Format("c: {0}-{1}:{2} | g:{3} s:{4}", startIdx, endIdx, nextIdx, minIdx, maxIdx).Dump();
+            offset = endIdx - nextIdx - 4;
+            // Console.WriteLine("c: [" + text.Substring(nextIdx + 4, offset) + "]");
+            if (string.IsNullOrWhiteSpace(text.Substring(nextIdx + 4, offset)))
+            {
+                text = text.Remove(nextIdx + 4, offset--).Insert(nextIdx + 4, " "); // remove whitespace
+                endIdx -= offset; // adjust indexs
+            }
+
+            // remove start to last statement with scan
+            var beforeStartIdx = startIdx - 1;
+            for (; beforeStartIdx > 0 && char.IsWhiteSpace(text[beforeStartIdx]); beforeStartIdx--) { }
+            if (beforeStartIdx > 0)
+            {
+                offset = startIdx - beforeStartIdx - 1;
+                //Console.WriteLine("d: [" + text.Substring(beforeStartIdx + 1, offset) + "]");
+                if (string.IsNullOrWhiteSpace(text.Substring(beforeStartIdx + 1, offset)))
+                    text = text.Remove(beforeStartIdx + 1, offset--).Insert(beforeStartIdx + 1, " "); // remove whitespace
+            }
+
+            // nextToken
+            nextIdx = endIdx;
+        }
+        return text;
     }
 
     public SyntaxNode ToSyntax()

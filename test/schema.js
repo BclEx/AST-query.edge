@@ -31,6 +31,44 @@ class User\n\
 }');
   });
 
+  it('test basic create class with schema and field', function () {
+    classAst = tree.schemaBuilder().withSchema('Schema').createClass('User', function (c) {
+      c.string('Field');
+    }).toAST();
+
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'cunit.add');
+    assert.deepEqual(classAst[0].ast, {
+      "f:NamespaceDeclaration": [{ "f:IdentifierName": ["Schema"] }], "b": [{ "w:Members": [{ "f:SingletonList<MemberDeclarationSyntax>": [{ "f:ClassDeclaration": ["User"], "b": [{ "w:Members": [{ "f:SingletonList<MemberDeclarationSyntax>": [{ "f:PropertyDeclaration": [{ "f:PredefinedType": [{ "f:Token": ["k:StringKeyword"] }] }, { "f:Identifier": ["Field"] }], "b": [{ "w:Modifiers": [{ "f:TokenList": [{ "f:Token": ["k:PublicKeyword"] }] }] }, { "w:AccessorList": [{ "f:AccessorList": [{ "f:List<AccessorDeclarationSyntax>": [{ "n:AccessorDeclarationSyntax": [{ "f:AccessorDeclaration": [{ "k:GetAccessorDeclaration": null }], "b": [{ "w:SemicolonToken": [{ "f:Token": ["k:SemicolonToken"] }] }] }, { "f:AccessorDeclaration": [{ "k:SetAccessorDeclaration": null }], "b": [{ "w:SemicolonToken": [{ "f:Token": ["k:SemicolonToken"] }] }] }] }] }], "b": [] }] }] }] }] }] }] }] }]
+    });
+    tree.alter(classAst);
+    assert.equal(tree.toString(), '\
+namespace Schema\n\
+{\n\
+    class User\n\
+    {\n\
+        public string Field { get; set; }\n\
+    }\n\
+}');
+  });
+
+  it('test basic create class with field and attribute', function () {
+    classAst = tree.schemaBuilder().createClass('User', function (c) {
+      c.string('Field').attribute({ DisplayName: ['Name'] });
+    }).toAST();
+
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'cunit.add');
+    // assert.deepEqual(classAst[0].ast, {});
+    tree.alter(classAst);
+    assert.equal(tree.toString(), '\
+class User\n\
+{\n\
+    [DisplayName("name")]\n\
+    public string Field { get; set; }\n\
+}');
+  });
+
   it('test drop class', function () {
     classAst = tree2.schemaBuilder().dropClass('User').toAST();
 
@@ -51,32 +89,38 @@ class User\n\
     assert.equal(tree2.toString(), null);
   });
 
-  // it('test drop member', function () {
-  //   classAst = tree.schemaBuilder().class('User', function () {
-  //     this.dropMember('foo');
-  //   }).toAST();
+  it('test drop member', function () {
+    classAst = tree.schemaBuilder().class('User', function () {
+      this.dropMember('Foo');
+    }).toAST();
 
-  //   assert.equal(1, classAst.length);
-  //   assert.equal(JSON.stringify(classAst[0].ast), 'ALTER TABLE [users] DROP COLUMN [foo]');
-  // });
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'class.dropMember');
+    assert.deepEqual(classAst[0].ast, { 'User': ['Foo'] });
+  });
 
-  // it('drops multiple members with an array', function () {
-  //   classAst = tree.schemaBuilder().class('User', function () {
-  //     this.dropMember(['foo', 'bar']);
-  //   }).toAST();
+  it('drops multiple members with an array', function () {
+    classAst = tree.schemaBuilder().class('User', function () {
+      this.dropMember(['Foo', 'Bar']);
+    }).toAST();
 
-  //   assert.equal(1, classAst.length);
-  //   assert.equal(JSON.stringify(classAst[0].ast), 'ALTER TABLE [users] DROP COLUMN [foo], [bar]');
-  // });
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'class.dropMember');
+    assert.deepEqual(classAst[0].ast, { 'User': ['Foo', 'Bar'] });
+  });
 
-  // it('drops multiple columns as multiple arguments', function () {
-  //   classAst = tree.schemaBuilder().class('User', function () {
-  //     this.dropMember('foo', 'bar');
-  //   }).toAST();
+  it('drops multiple columns as multiple arguments', function () {
+    classAst = tree.schemaBuilder().class('User', function () {
+      this.dropMember('Foo', 'Bar');
+    }).toAST();
 
-  //   assert.equal(1, classAst.length);
-  //   assert.equal(JSON.stringify(classAst[0].ast), 'ALTER TABLE [users] DROP COLUMN [foo], [bar]');
-  // });
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'class.dropMember');
+    assert.deepEqual(classAst[0].ast, { 'User': ['Foo', 'Bar'] });
+  });
+
+
+
 
   // it('test drop Method', function () {
   //   classAst = tree.schemaBuilder().class('User', function () {
@@ -84,7 +128,8 @@ class User\n\
   //   }).toAST();
 
   //   assert.equal(1, classAst.length);
-  //   assert.equal(JSON.stringify(classAst[0].ast), 'ALTER TABLE [users] DROP PRIMARY KEY');
+  //   assert.equal(classAst[0].method, 'class.dropMember');
+  //   assert.deepEqual(classAst[0].ast, {});
   // });
 
   it('test rename class', function () {

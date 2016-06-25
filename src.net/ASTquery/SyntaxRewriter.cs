@@ -28,27 +28,21 @@ public class SyntaxRewriter : CSharpSyntaxRewriter
     public override SyntaxNode VisitClassDeclaration(ClassDeclarationSyntax node)
     {
         var className = node.Identifier.ValueText;
-        //Console.WriteLine(_alters.First().Key);
-        if (_alters.Contains("class.rename"))
+        if (_alters.Contains("class.add"))
         {
-            var single = _alters["class.rename"].Select(x => x.FactoryMethodCall as MethodCall).SingleOrDefault(x => x.Name == className);
-            if (single != null)
-                node = node.WithIdentifier(SyntaxFactory.Identifier((string)single.Arguments.First())).NormalizeWhitespace();
+            var nodes = _alters["class.add"].Select(x => (MemberDeclarationSyntax)x.ToSyntax()).ToArray();
+            node.AddMembers(nodes);
         }
         if (_alters.Contains("class.remove"))
         {
             if (_alters["class.remove"].Any(x => x.FactoryMethodCall.Name == className))
                 return null;
         }
-        if (_alters.Contains("class.add"))
+        if (_alters.Contains("class.rename"))
         {
-            var nodes = _alters["class.add"].Select(x => (MemberDeclarationSyntax)x.ToSyntax()).ToArray();
-            node.AddMembers(nodes);
-        }
-        var alters = _alters["class"];
-        foreach (var alter in alters)
-        {
-            Console.Write(node);
+            var single = _alters["class.rename"].Select(x => x.FactoryMethodCall as MethodCall).SingleOrDefault(x => x.Name == className);
+            if (single != null)
+                node = node.WithIdentifier(SyntaxFactory.Identifier((string)single.Arguments.First())).NormalizeWhitespace();
         }
         return base.VisitClassDeclaration(node);
     }
