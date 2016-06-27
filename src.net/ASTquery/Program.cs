@@ -51,12 +51,12 @@ namespace QuoterHost
 
             //var jsonAst = "[{'method':'class.rename','ast':{'User':['Foo']},'bindings':{}}]".Replace("'", "\"");
             //var alters = NodeAlter.FromJson(jsonAst);
-
+            //[DisplayName(""Name""), Required]
             var sourceText = @"
-class Test
+class User
 {
-    [DisplayName(""Name""), Required]
-    public string Field { get; }
+    [DisplayName(""Name""), Required, MaxLength(10)]
+    public string Field { get; set; }
 }";
 
             var sourceNode = (CSharpSyntaxTree.ParseText(sourceText).GetRoot() as CSharpSyntaxNode);

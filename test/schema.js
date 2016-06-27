@@ -64,7 +64,40 @@ namespace Schema\n\
     assert.equal(tree.toString(), '\
 class User\n\
 {\n\
-    [DisplayName("name")]\n\
+    [DisplayName("Name")]\n\
+    public string Field { get; set; }\n\
+}');
+  });
+
+  it('test basic create class with field and two attributes', function () {
+    classAst = tree.schemaBuilder().createClass('User', function (c) {
+      c.string('Field').attribute({ DisplayName: ['Name'] }, { Required: null });
+    }).toAST();
+
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'cunit.add');
+    // assert.deepEqual(classAst[0].ast, {});
+    tree.alter(classAst);
+    assert.equal(tree.toString(), '\
+class User\n\
+{\n\
+    [DisplayName("Name"), Required]\n\
+    public string Field { get; set; }\n\
+}');
+  });
+  it('test basic create class with field and three attributes as array', function () {
+    classAst = tree.schemaBuilder().createClass('User', function (c) {
+      c.string('Field').attribute([{ DisplayName: ['Name'] }, { Required: null }, { MaxLength: '30' }]);
+    }).toAST();
+
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'cunit.add');
+    // assert.deepEqual(classAst[0].ast, {});
+    tree.alter(classAst);
+    assert.equal(tree.toString(), '\
+class User\n\
+{\n\
+    [DisplayName("Name"), Required, MaxLength("30")]\n\
     public string Field { get; set; }\n\
 }');
   });
