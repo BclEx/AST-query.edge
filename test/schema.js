@@ -54,7 +54,7 @@ namespace Schema\n\
 
   it('test basic create class with field and attribute', function () {
     classAst = tree.schemaBuilder().createClass('User', function (c) {
-      c.string('Field').attribute({ DisplayName: ['Name'] });
+      c.string('Field').attribute({ DisplayName: 'Name' });
     }).toAST();
 
     assert.equal(1, classAst.length);
@@ -71,7 +71,7 @@ class User\n\
 
   it('test basic create class with field and two attributes', function () {
     classAst = tree.schemaBuilder().createClass('User', function (c) {
-      c.string('Field').attribute({ DisplayName: ['Name'] }, { Required: null });
+      c.string('Field').attribute({ DisplayName: 'Name' }, { Required: null });
     }).toAST();
 
     assert.equal(1, classAst.length);
@@ -87,7 +87,7 @@ class User\n\
   });
   it('test basic create class with field and three attributes as array', function () {
     classAst = tree.schemaBuilder().createClass('User', function (c) {
-      c.string('Field').attribute([{ DisplayName: ['Name'] }, { Required: null }, { MaxLength: '30' }]);
+      c.string('Field').attribute([{ DisplayName: 'Name' }, { Required: null }, { MaxLength: 30 }]);
     }).toAST();
 
     assert.equal(1, classAst.length);
@@ -97,7 +97,7 @@ class User\n\
     assert.equal(tree.toString(), '\
 class User\n\
 {\n\
-    [DisplayName("Name"), Required, MaxLength("30")]\n\
+    [DisplayName("Name"), Required, MaxLength(30)]\n\
     public string Field { get; set; }\n\
 }');
   });

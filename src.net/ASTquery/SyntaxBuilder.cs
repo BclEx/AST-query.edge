@@ -338,7 +338,7 @@ public class SyntaxBuilder
         if (value is SyntaxNode)
             return QuoteNodeRecurse((SyntaxNode)value, property.Name);
         if (value is string)
-            return new Node(property.Name, EscapeAndQuote("*", value.ToString()));
+            return new Node(property.Name, Escape(value.ToString()));
         if (value is bool)
             return new Node(property.Name, value.ToString().ToLowerInvariant());
         return null;
@@ -462,8 +462,7 @@ public class SyntaxBuilder
             return null;
         var arguments = new List<object>();
         var methodName = GetSyntaxFactory("Token");
-        var verbatim = value.Text.StartsWith("@") || value.Text.Contains("\r") || value.Text.Contains("\n");
-        var escapedTokenValueText = EscapeAndQuote(value.ToString(), verbatim);
+        var escapedTokenValueText = Escape(value.ToString());
         var leading = GetLeadingTrivia(value);
         object actualValue;
         var trailing = GetTrailingTrivia(value);
@@ -515,11 +514,11 @@ public class SyntaxBuilder
             var shouldAddTrivia = (leading != null || trailing != null);
             if (shouldAddTrivia)
                 arguments.Add(leading ?? GetEmptyTrivia("LeadingTrivia"));
-            var escapedText = EscapeAndQuote(value.Text);
+            var escapedText = Escape(value.Text);
             string escapedValue;
-            if (valueKind == SyntaxKind.CharacterLiteralToken) escapedValue = EscapeAndQuote(value.ValueText, "'");
-            else if (valueKind != SyntaxKind.StringLiteralToken) escapedValue = value.ValueText;
-            else escapedValue = EscapeAndQuote(value.ValueText);
+            if (valueKind == SyntaxKind.CharacterLiteralToken) escapedValue = Escape(value.ValueText, "c");
+            else if (valueKind != SyntaxKind.StringLiteralToken) escapedValue = Escape(value.ValueText, "n");
+            else escapedValue = Escape(value.ValueText);
             if (shouldAddTrivia || (valueKind == SyntaxKind.StringLiteralToken && value.ToString() != SyntaxFactory.Literal(value.ValueText).ToString()))
                 arguments.Add(escapedText);
             arguments.Add(escapedValue);
@@ -593,7 +592,7 @@ public class SyntaxBuilder
         else if (syntaxKind == SyntaxKind.DocumentationCommentExteriorTrivia) factoryMethodName = GetSyntaxFactory("DocumentationCommentExterior");
         if (factoryMethodName == null)
             return null;
-        var argument = (syntaxTrivia.HasStructure ? (object)QuoteNodeRecurse(syntaxTrivia.GetStructure(), "Structure") : EscapeAndQuote(text));
+        var argument = (syntaxTrivia.HasStructure ? (object)QuoteNodeRecurse(syntaxTrivia.GetStructure(), "Structure") : Escape(text));
         return new Node(null, factoryMethodName, CreateArgumentList(argument));
     }
 
@@ -601,46 +600,22 @@ public class SyntaxBuilder
 
     #region Escape
 
-    public static string EscapeAndQuote(string text, string quoteChar = "\"")
+    public static string Escape(string text, string type = null)
     {
-        var verbatim = (text.Contains("\n") || text.Contains("\r"));
-        return EscapeAndQuote(text, verbatim, quoteChar);
+        if (text == Environment.NewLine || text == "\n")
+            return "\n";
+        return (type == null ? text : type + "|" + text);
     }
 
-    public static string EscapeAndQuote(string text, bool verbatim, string quoteChar = "\"")
+    private static object Unescape(string value)
     {
-        //if (text == Environment.NewLine)
-        //    return "Environment.NewLine";
-        //if (text == "\n")
-        //    return "\"\\n\"";
-        //text = Escape(text, verbatim);
-        //text = SurroundWithQuotes(text, quoteChar);
-        //if (verbatim)
-        //    text = "@" + text;
-        return text;
-    }
-
-    /// <summary>
-    /// Escapes strings to be included within "" using C# escaping rules
-    /// </summary>
-    public static string Escape(string text, bool escapeVerbatim = false)
-    {
-        var sb = new StringBuilder();
-        for (var i = 0; i < text.Length; i++)
-        {
-            string toAppend;
-            if (text[i] == '"') toAppend = (escapeVerbatim ? "\"\"" : "\\\"");
-            else if (text[i] == '\\' && !escapeVerbatim) toAppend = "\\\\";
-            else toAppend = text[i].ToString();
-            sb.Append(toAppend);
-        }
-        return sb.ToString();
-    }
-
-    private static string SurroundWithQuotes(string text, string quoteChar = "\"")
-    {
-        text = quoteChar + text + quoteChar;
-        return text;
+        if (value.Length < 2 || value[1] != '|')
+            return value;
+        //Console.WriteLine(value);
+        if (value[0] == 's') return value.Substring(2, value.Length - 2);
+        else if (value[0] == 'n') return int.Parse(value.Substring(2, value.Length - 2));
+        else if (value[0] == 'c') return value[2];
+        return value;
     }
 
     #endregion
@@ -734,7 +709,8 @@ public class SyntaxBuilder
         w.WriteStartArray();
         foreach (var block in methodCall.Arguments)
         {
-            if (block is string) w.WriteValue((string)block);
+            if (block is int) w.WriteValue((int)block);
+            else if (block is string) w.WriteValue((string)block);
             else if (block is SyntaxKind) w.WriteValue("k:" + ((SyntaxKind)block).ToString());
             else if (block is Node) ToJsonRecurse(block as Node, w);
         }
@@ -755,8 +731,9 @@ public class SyntaxBuilder
         var args = new List<object>();
         while (r.TokenType != JsonToken.EndArray)
         {
-            if (r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+            if (r.TokenType != JsonToken.Integer && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
             else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonRecurse(r));
+            else if (r.TokenType == JsonToken.Integer) { args.Add("n|" + r.Value.ToString()); r.Read(); }
             else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) { args.Add(r.Value); r.Read(); }
             else if (r.TokenType == JsonToken.String) { args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2))); r.Read(); }
             else throw new InvalidOperationException(r.TokenType.ToString());
@@ -775,7 +752,8 @@ public class SyntaxBuilder
         var args = new List<object>();
         foreach (var block in methodCall.Arguments)
         {
-            if (block is string) args.Add(block);
+            if (block is int) args.Add(Unescape("n|" + block.ToString()));
+            else if (block is string) args.Add(Unescape((string)block));
             else if (block is SyntaxKind) args.Add(block);
             else if (block is Node) args.Add(FromApiRecurse(block as Node));
         }
@@ -796,9 +774,10 @@ public class SyntaxBuilder
         var args = new List<object>();
         while (r.TokenType != JsonToken.EndArray)
         {
-            if (r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+            if (r.TokenType != JsonToken.Integer && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
             else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonToSyntaxRecurse(r));
-            else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) { args.Add(r.Value); r.Read(); }
+            else if (r.TokenType == JsonToken.Integer) { args.Add(Unescape("n|" + r.Value.ToString())); r.Read(); }
+            else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) { args.Add(Unescape((string)r.Value)); r.Read(); }
             else if (r.TokenType == JsonToken.String) { args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2))); r.Read(); }
             else throw new InvalidOperationException(r.TokenType.ToString());
         }
