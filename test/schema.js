@@ -10,7 +10,7 @@ class User\n\
     public string Field { get; set; }\n\
 }', null, null);
 
-describe("SchemaBuilder", function () {
+describe('SchemaBuilder', function () {
 
   var classAst;
   it('test basic create class with string', function () {
@@ -21,7 +21,7 @@ describe("SchemaBuilder", function () {
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
     assert.deepEqual(classAst[0].ast, {
-      "f:ClassDeclaration": ["User"], "b": [{ "w:Members": [{ "f:SingletonList<MemberDeclarationSyntax>": [{ "f:PropertyDeclaration": [{ "f:PredefinedType": [{ "f:Token": ["k:StringKeyword"] }] }, { "f:Identifier": ["Field"] }], "b": [{ "w:Modifiers": [{ "f:TokenList": [{ "f:Token": ["k:PublicKeyword"] }] }] }, { "w:AccessorList": [{ "f:AccessorList": [{ "f:List<AccessorDeclarationSyntax>": [{ "n:AccessorDeclarationSyntax": [{ "f:AccessorDeclaration": [{ "k:GetAccessorDeclaration": null }], "b": [{ "w:SemicolonToken": [{ "f:Token": ["k:SemicolonToken"] }] }] }, { "f:AccessorDeclaration": [{ "k:SetAccessorDeclaration": null }], "b": [{ "w:SemicolonToken": [{ "f:Token": ["k:SemicolonToken"] }] }] }] }] }], "b": [] }] }] }] }] }]
+      'f:ClassDeclaration': ['User'], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] // jshint ignore:line
     });
     tree.alter(classAst);
     assert.equal(tree.toString(), '\
@@ -39,7 +39,7 @@ class User\n\
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
     assert.deepEqual(classAst[0].ast, {
-      "f:NamespaceDeclaration": [{ "f:IdentifierName": ["Schema"] }], "b": [{ "w:Members": [{ "f:SingletonList<MemberDeclarationSyntax>": [{ "f:ClassDeclaration": ["User"], "b": [{ "w:Members": [{ "f:SingletonList<MemberDeclarationSyntax>": [{ "f:PropertyDeclaration": [{ "f:PredefinedType": [{ "f:Token": ["k:StringKeyword"] }] }, { "f:Identifier": ["Field"] }], "b": [{ "w:Modifiers": [{ "f:TokenList": [{ "f:Token": ["k:PublicKeyword"] }] }] }, { "w:AccessorList": [{ "f:AccessorList": [{ "f:List<AccessorDeclarationSyntax>": [{ "n:AccessorDeclarationSyntax": [{ "f:AccessorDeclaration": [{ "k:GetAccessorDeclaration": null }], "b": [{ "w:SemicolonToken": [{ "f:Token": ["k:SemicolonToken"] }] }] }, { "f:AccessorDeclaration": [{ "k:SetAccessorDeclaration": null }], "b": [{ "w:SemicolonToken": [{ "f:Token": ["k:SemicolonToken"] }] }] }] }] }], "b": [] }] }] }] }] }] }] }] }]
+      'f:NamespaceDeclaration': [{ 'f:IdentifierName': ['Schema'] }], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:ClassDeclaration': ['User'], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] }] }] }] // jshint ignore:line
     });
     tree.alter(classAst);
     assert.equal(tree.toString(), '\
@@ -59,7 +59,7 @@ namespace Schema\n\
 
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
-    // assert.deepEqual(classAst[0].ast, {});
+    // assert.deepEqual(classAst[0].ast, {}); // jshint ignore:line
     tree.alter(classAst);
     assert.equal(tree.toString(), '\
 class User\n\
@@ -209,16 +209,16 @@ class Foo\n\
   //   }).toSQL();
 
   //   equal(1, tableSql.length);
-  //   expect(tableSql[0].sql).to.equal('ALTER TABLE [users] ADD CONSTRAINT [users_foo_id_foreign] FOREIGN KEY ([foo_id]) REFERENCES [orders] ([id])');
+  //   expect(tableSql[0].sql).to.equal('');
   // });
 
-  // it("adds foreign key with onUpdate and onDelete", function() {
+  // it('adds foreign key with onUpdate and onDelete', function() {
   //   tableSql = client.schemaBuilder().createTable('person', function(table) {
   //     table.integer('user_id').notNull().references('users.id').onDelete('SET NULL');
   //     table.integer('account_id').notNull().references('id').inTable('accounts').onUpdate('cascade');
   //   }).toSQL();
   //   equal(1, tableSql.length);
-  //   expect(tableSql[0].sql).to.equal('CREATE TABLE [person] ([user_id] int not null, [account_id] int not null, CONSTRAINT [person_user_id_foreign] FOREIGN KEY ([user_id]) REFERENCES [users] ([id]) ON DELETE SET NULL, CONSTRAINT [person_account_id_foreign] FOREIGN KEY ([account_id]) REFERENCES [accounts] ([id]) ON UPDATE cascade)');
+  //   expect(tableSql[0].sql).to.equal('');
   // });
 
   // it('test adding incrementing id', function() {
@@ -488,7 +488,7 @@ class Foo\n\
   //   }).toSQL();
 
   //   equal(1, tableSql.length);
-  //   expect(tableSql[0].sql).to.equal('ALTER TABLE [composite_key_test] DROP CONSTRAINT [composite_key_test_column_a_column_b_unique]');
+  //   expect(tableSql[0].sql).to.equal('');
   // });
 
   // it('allows default as alias for defaultTo', function() {
@@ -505,13 +505,13 @@ class Foo\n\
   //   tableSql = client.schemaBuilder().table('users', function(t) {
   //     t.primary(['test1', 'test2'], 'testconstraintname');
   //   }).toSQL();
-  //   expect(tableSql[0].sql).to.equal('ALTER TABLE [users] ADD CONSTRAINT [testconstraintname] PRIMARY KEY ([test1], [test2])');
+  //   expect(tableSql[0].sql).to.equal('');
 
   //   tableSql = client.schemaBuilder().createTable('users', function(t) {
   //     t.string('test').primary('testconstraintname');
   //   }).toSQL();
 
-  //   expect(tableSql[0].sql).to.equal('CREATE TABLE [users] ([test] nvarchar(255), CONSTRAINT [testconstraintname] PRIMARY KEY ([test]))');
+  //   expect(tableSql[0].sql).to.equal('');
   // });
 
 });
