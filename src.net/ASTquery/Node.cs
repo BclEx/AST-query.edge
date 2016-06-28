@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Newtonsoft.Json;
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -154,6 +155,15 @@ public class Node
     {
         var tree = (SyntaxNode)SyntaxBuilder.FromApiRecurse(this);
         tree = tree.NormalizeWhitespace();
+        return tree;
+    }
+
+    public IEnumerable<T> ToSyntax<T>()
+        where T : SyntaxNode
+    {
+        var tree = ((IEnumerable<T>)SyntaxBuilder.FromApiRecurse(this))
+            .Select(x => x.NormalizeWhitespace())
+            .ToList();
         return tree;
     }
 

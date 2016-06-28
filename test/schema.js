@@ -23,7 +23,6 @@ describe('SchemaBuilder', function () {
     assert.deepEqual(classAst[0].ast, {
       'f:ClassDeclaration': ['User'], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] // jshint ignore:line
     });
-    tree.alter(classAst);
     assert.equal(tree.toString(), '\
 class User\n\
 {\n\
@@ -41,7 +40,6 @@ class User\n\
     assert.deepEqual(classAst[0].ast, {
       'f:NamespaceDeclaration': [{ 'f:IdentifierName': ['Schema'] }], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:ClassDeclaration': ['User'], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] }] }] }] // jshint ignore:line
     });
-    tree.alter(classAst);
     assert.equal(tree.toString(), '\
 namespace Schema\n\
 {\n\
@@ -60,7 +58,6 @@ namespace Schema\n\
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
     // assert.deepEqual(classAst[0].ast, {}); // jshint ignore:line
-    tree.alter(classAst);
     assert.equal(tree.toString(), '\
 class User\n\
 {\n\
@@ -77,7 +74,6 @@ class User\n\
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
     // assert.deepEqual(classAst[0].ast, {});
-    tree.alter(classAst);
     assert.equal(tree.toString(), '\
 class User\n\
 {\n\
@@ -85,6 +81,7 @@ class User\n\
     public string Field { get; set; }\n\
 }');
   });
+
   it('test basic create class with field and three attributes as array', function () {
     classAst = tree.schemaBuilder().createClass('User', function (c) {
       c.string('Field').attribute([{ DisplayName: 'Name' }, { Required: null }, { MaxLength: 30 }]);
@@ -93,7 +90,6 @@ class User\n\
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
     // assert.deepEqual(classAst[0].ast, {});
-    tree.alter(classAst);
     assert.equal(tree.toString(), '\
 class User\n\
 {\n\
@@ -102,13 +98,24 @@ class User\n\
 }');
   });
 
+  it('test add using', function () {
+    classAst = tree.schemaBuilder().addUsing('System', 'System.Data').toAST();
+
+    assert.equal(1, classAst.length);
+    assert.equal(classAst[0].method, 'cunit.using');
+    // assert.deepEqual(classAst[0].ast, {});
+    assert.equal(tree.toString(), '\
+using System;\n\
+using System.Data;');
+  });
+
+
   it('test drop class', function () {
     classAst = tree2.schemaBuilder().dropClass('User').toAST();
 
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'class.remove');
     assert.deepEqual(classAst[0].ast, { User: null });
-    tree2.alter(classAst);
     assert.equal(tree2.toString(), null);
   });
 
@@ -118,7 +125,6 @@ class User\n\
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'class.remove');
     assert.deepEqual(classAst[0].ast, { User: null });
-    tree2.alter(classAst);
     assert.equal(tree2.toString(), null);
   });
 
@@ -171,7 +177,6 @@ class User\n\
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'class.rename');
     assert.deepEqual(classAst[0].ast, { User: ['Foo'] });
-    tree2.alter(classAst);
     assert.equal(tree2.toString(), '\
 class Foo\n\
 {\n\

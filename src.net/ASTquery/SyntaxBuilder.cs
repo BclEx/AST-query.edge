@@ -731,8 +731,9 @@ public class SyntaxBuilder
         var args = new List<object>();
         while (r.TokenType != JsonToken.EndArray)
         {
-            if (r.TokenType != JsonToken.Integer && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+            if (r.TokenType != JsonToken.Null && r.TokenType != JsonToken.Integer && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
             else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonRecurse(r));
+            else if (r.TokenType == JsonToken.Null) { args.Add(null); r.Read(); }
             else if (r.TokenType == JsonToken.Integer) { args.Add("n|" + r.Value.ToString()); r.Read(); }
             else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) { args.Add(r.Value); r.Read(); }
             else if (r.TokenType == JsonToken.String) { args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2))); r.Read(); }
@@ -774,8 +775,9 @@ public class SyntaxBuilder
         var args = new List<object>();
         while (r.TokenType != JsonToken.EndArray)
         {
-            if (r.TokenType != JsonToken.Integer && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
+            if (r.TokenType != JsonToken.Null && r.TokenType != JsonToken.Integer && r.TokenType != JsonToken.String && r.TokenType != JsonToken.StartObject) throw new InvalidOperationException();
             else if (r.TokenType == JsonToken.StartObject) args.Add(FromJsonToSyntaxRecurse(r));
+            else if (r.TokenType == JsonToken.Null) { args.Add(null); r.Read(); }
             else if (r.TokenType == JsonToken.Integer) { args.Add(Unescape("n|" + r.Value.ToString())); r.Read(); }
             else if (r.TokenType == JsonToken.String && !((string)r.Value).StartsWith("k:")) { args.Add(Unescape((string)r.Value)); r.Read(); }
             else if (r.TokenType == JsonToken.String) { args.Add(Enum.Parse(typeof(SyntaxKind), ((string)r.Value).Substring(2))); r.Read(); }

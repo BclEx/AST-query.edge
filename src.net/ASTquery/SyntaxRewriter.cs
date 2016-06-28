@@ -22,6 +22,12 @@ public class SyntaxRewriter : CSharpSyntaxRewriter
             var nodes = _alters["cunit.add"].Select(x => (MemberDeclarationSyntax)x.ToSyntax()).ToArray();
             node = node.AddMembers(nodes);
         }
+        if (_alters.Contains("cunit.using"))
+        {
+            var nodes = _alters["cunit.using"].SelectMany(x => x.ToSyntax<UsingDirectiveSyntax>()).ToArray();
+            node = node.AddUsings(nodes);
+            node = node.NormalizeWhitespace();
+        }
         return node;
     }
 

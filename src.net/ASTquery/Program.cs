@@ -1,6 +1,8 @@
 ﻿#if !_LIB
 using System;
+using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace QuoterHost
 {
@@ -49,15 +51,31 @@ namespace QuoterHost
             //    }
             //}";
 
-            //var jsonAst = "[{'method':'class.rename','ast':{'User':['Foo']},'bindings':{}}]".Replace("'", "\"");
-            //var alters = NodeAlter.FromJson(jsonAst);
-            //[DisplayName(""Name""), Required]
+
+            //            var sourceText = @"
+            //class User
+            //{
+            //    [DisplayName(""Name""), Required, MaxLength(10)]
+            //    public string Field { get; set; }
+            //}";
+
             var sourceText = @"
-class User
-{
-    [DisplayName(""Name""), Required, MaxLength(10)]
-    public string Field { get; set; }
-}";
+using System;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations.Anto;
+            class User
+            {
+                public string Field { get; set; }
+            }";
+
+            //var alterJson = "[{'method':'cunit.using','ast':{'f:List<UsingDirectiveSyntax>':[{'n:UsingDirectiveSyntax':[{'f:UsingDirective':[{'f:IdentifierName':['System']}]},{'f:UsingDirective':[{'f:QualifiedName':[{'f:IdentifierName':['System']},{'f:IdentifierName':['Data']}]}]}]}]},'bindings':{}}]".Replace("'", "\"");
+            //var alterJson = "[{'method':'cunit.using','ast':{'f:List<UsingDirectiveSyntax>':[{'n:UsingDirectiveSyntax':[{'f:UsingDirective':[{'f:IdentifierName':['System']}]},{'f:UsingDirective':[{'f:QualifiedName':[{'f:IdentifierName':['System']},{'f:IdentifierName':['ComponentModel']}]}]},{'f:UsingDirective':[{'f:QualifiedName':[{'f:IdentifierName':['System']},{'f:IdentifierName':['ComponentModel']},{'f:IdentifierName':['DataAnnotations']}]}]}]}]},'bindings':{}}]".Replace("'", "\"");
+            //var alterNode = NodeAlter.FromJson(alterJson).First();
+            //var syntax = alterNode.Node.ToSyntax<UsingDirectiveSyntax>();
+
+
+
+
 
             var sourceNode = (CSharpSyntaxTree.ParseText(sourceText).GetRoot() as CSharpSyntaxNode);
 #if _Full
