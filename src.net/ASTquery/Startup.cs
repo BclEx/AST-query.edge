@@ -9,6 +9,7 @@ namespace ASTquery
     {
         public async Task<object> Parse(object input)
         {
+            //Console.WriteLine((string)input);
             var quoter = new SyntaxBuilder();
             var tree = quoter.Parse((string)input);
             return tree.ToJson();
@@ -19,6 +20,7 @@ namespace ASTquery
             var jsonAst = (string)input.ast;
             var jsonAlters = (string)input.alters;
             var tree = (!string.IsNullOrEmpty(jsonAst) ? Node.FromJsonToSyntax(jsonAst) : SyntaxFactory.CompilationUnit());
+            //Console.WriteLine(jsonAst);
             //Console.WriteLine(jsonAlters);
             var alters = (jsonAlters != null ? NodeAlter.FromJson(jsonAlters) : null);
             if (alters != null)

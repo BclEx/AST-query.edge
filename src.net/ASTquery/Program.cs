@@ -60,10 +60,7 @@ namespace QuoterHost
             //}";
 
             var sourceText = @"
-using System;
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations.Anto;
-            class User
+            public class User
             {
                 public string Field { get; set; }
             }";
