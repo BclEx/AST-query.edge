@@ -21,10 +21,12 @@ describe('SchemaBuilder', function () {
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
     assert.deepEqual(classAst[0].ast, {
-      'f:ClassDeclaration': ['User'], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] // jshint ignore:line
+      'f:ClassDeclaration': ['User'], 'b': [
+        { 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] },
+        { 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] // jshint ignore:line
     });
     assert.equal(tree.toString(), '\
-class User\n\
+public class User\n\
 {\n\
     public string Field { get; set; }\n\
 }');
@@ -38,12 +40,21 @@ class User\n\
     assert.equal(1, classAst.length);
     assert.equal(classAst[0].method, 'cunit.add');
     assert.deepEqual(classAst[0].ast, {
-      'f:NamespaceDeclaration': [{ 'f:IdentifierName': ['Schema'] }], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:ClassDeclaration': ['User'], 'b': [{ 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] }] }] }] // jshint ignore:line
+      'f:NamespaceDeclaration': [{ 'f:IdentifierName': ['Schema'] }], 'b': [
+        {
+          'w:Members': [{
+            'f:SingletonList<MemberDeclarationSyntax>': [{
+              'f:ClassDeclaration': ['User'], 'b': [
+                { 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] },
+                { 'w:Members': [{ 'f:SingletonList<MemberDeclarationSyntax>': [{ 'f:PropertyDeclaration': [{ 'f:PredefinedType': [{ 'f:Token': ['k:StringKeyword'] }] }, { 'f:Identifier': ['Field'] }], 'b': [{ 'w:Modifiers': [{ 'f:TokenList': [{ 'f:Token': ['k:PublicKeyword'] }] }] }, { 'w:AccessorList': [{ 'f:AccessorList': [{ 'f:List<AccessorDeclarationSyntax>': [{ 'n:AccessorDeclarationSyntax': [{ 'f:AccessorDeclaration': [{ 'k:GetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }, { 'f:AccessorDeclaration': [{ 'k:SetAccessorDeclaration': null }], 'b': [{ 'w:SemicolonToken': [{ 'f:Token': ['k:SemicolonToken'] }] }] }] }] }], 'b': [] }] }] }] }] }] // jshint ignore:line
+            }]
+          }]
+        }]
     });
     assert.equal(tree.toString(), '\
 namespace Schema\n\
 {\n\
-    class User\n\
+    public class User\n\
     {\n\
         public string Field { get; set; }\n\
     }\n\
@@ -59,7 +70,7 @@ namespace Schema\n\
     assert.equal(classAst[0].method, 'cunit.add');
     // assert.deepEqual(classAst[0].ast, {}); // jshint ignore:line
     assert.equal(tree.toString(), '\
-class User\n\
+public class User\n\
 {\n\
     [DisplayName("Name")]\n\
     public string Field { get; set; }\n\
@@ -75,7 +86,7 @@ class User\n\
     assert.equal(classAst[0].method, 'cunit.add');
     // assert.deepEqual(classAst[0].ast, {});
     assert.equal(tree.toString(), '\
-class User\n\
+public class User\n\
 {\n\
     [DisplayName("Name"), Required]\n\
     public string Field { get; set; }\n\
@@ -91,7 +102,7 @@ class User\n\
     assert.equal(classAst[0].method, 'cunit.add');
     // assert.deepEqual(classAst[0].ast, {});
     assert.equal(tree.toString(), '\
-class User\n\
+public class User\n\
 {\n\
     [DisplayName("Name"), Required, MaxLength(30)]\n\
     public string Field { get; set; }\n\
@@ -159,8 +170,6 @@ using System.Data;');
   });
 
 
-
-
   // it('test drop Method', function () {
   //   classAst = tree.schemaBuilder().class('User', function () {
   //     this.dropMethod('foo');
@@ -183,9 +192,6 @@ class Foo\n\
     public string Field { get; set; }\n\
 }');
   });
-
-
-
 
 
 
